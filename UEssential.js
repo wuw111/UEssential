@@ -1,24 +1,19 @@
 /*-----------------------------------------------------------------------
- * UEssential 基础生存插件 - v1.0.0
+ * UEssential 基础生存插件 - v1.1.0
  * Copyright (c) 2024-2026 wuw111. All rights reserved.
  * 
- * [授权声明]
- * 1. 原版文件仅限 GitHub、KLPBBS、MineBBS 官方发布，禁止私自转载。
- * 2. 严禁任何形式的商用（包括但不限于出售、加入付费整合包、在售卖VIP/特权/提供氪金赞助的商业服务器内使用）。
- * 3. 允许修改，但无论是否对外分发文件，只要在公共网络/服务器上运行了修改版，就必须向公众公开完整源码，并遵守同等协议。
- * 4. 详细授权条款请参阅项目根目录下的 LICENSE 文件。
+ * [授权声明 - CASAL v1.0]
+ * 1. 本项目基于 CASAL v1.0 协议授权。官方发布渠道仅限 GitHub、KLPBBS、MineBBS，禁止未经许可的转载。
+ * 2. 运行环境：本插件仅限服务端运行，严禁将本体代码或逻辑分发至客户端（如JS源码内容等）。
+ * 3. 允许二次开发，但在公网服务器运行修改版时，必须公开完整源码并沿用 CASAL 协议。
+ * 4. 商业：允许商业服务器部署使用。但【严禁】直接售卖插件、将其加入付费整合包，或在商业服务器内将插件内功能设为“付费解锁”。
+ * 5. 欺诈警告：本插件永久免费。若您为获取插件文件或解锁其内部功能而付费，说明您已被骗，请立即举报。
  * 
- * [温馨提示]
- * 1. 如果您是花钱购买的本插件，说明您已被骗，请立即退款并举报。
+ * 详细条款、例外情况及授权定义请参阅项目根目录下的 LICENSE 文件。
  *-----------------------------------------------------------------------*/
 
-// UEssential 基础生存插件 - v1.0.0
-// 作者：wuw111
-// Licensed under the UESAL License.
-// GitHub发布仓库：https://github.com/wuw111/UEssential
-
 const PLUGIN_NAME = "UEssential";
-const VERSION = [1, 0, 0];
+const VERSION = [1, 1, 0];
 const PREFIX = "§b§l[UEssential]§r ";
 const DIR_PATH = "plugins/" + PLUGIN_NAME;
 const LANG_PATH = DIR_PATH + "/lang";
@@ -59,7 +54,9 @@ const DEFAULT_CONFIG = {
     back: { enabled: true, maxDeathRecords: 5, costFormula: "10 * Math.pow(1.001, count) * Math.pow(index, 0.5)" },
     notice: { enabled: true, content: "§l§e欢迎来到服务器！§r\n这里是基础生存服务器，请和谐游戏。\n输入 §a/notice§r 可以再次查看此公告。" },
     motd: { enabled: false, intervalSeconds: 5, list: ["§b欢迎来到服务器", "§a当前在线: {online}", "§e当前TPS: {tps}"] },
-    customCommands: { enabled: true, superAdmins: ["9999999999999999"] }
+    customCommands: { enabled: true, superAdmins: ["9999999999999999"] },
+    playerManage: { enabled: true },
+    playerDatabase: { enabled: true }
 };
 
 const configPath = DIR_PATH + "/config.json";
@@ -316,6 +313,9 @@ const cusCmdDb = new JsonConfigFile(DIR_PATH + "/cuscmds.json", JSON.stringify({
     }
 }));
 
+const pdbDb = new JsonConfigFile(DIR_PATH + "/playerdatabase.json", "{}");
+const regDb = new JsonConfigFile(DIR_PATH + "/regplayer.json", JSON.stringify({ total: 0, records: {} }));
+
 let csvLogQueue = [];
 
 function csvLog(event, playerStr, dataStr) {
@@ -544,6 +544,26 @@ mc.listen("onTick", () => {
             }
             if (modified) pubHomeDb.write(JSON.stringify(pubObj, null, 4));
         }
+
+        if (config.get("playerDatabase") && config.get("playerDatabase").enabled) {
+            let inc = 0.95;
+            let tpsCfg = config.get("tps");
+            if (tpsCfg && tpsCfg.enabled) {
+                let tpsStr = getAvgTps(60); 
+                let tps = parseFloat(tpsStr);
+                if (!isNaN(tps) && tps > 0) inc = 20 / tps;
+                else inc = 1.0;
+            }
+            let players = mc.getOnlinePlayers();
+            for (let pl of players) {
+                if (pl.isSimulatedPlayer()) continue;
+                let data = pdbDb.get(pl.xuid);
+                if (data) {
+                    data.OnlineTime = Math.round(((data.OnlineTime || 0) + inc) * 100) / 100;
+                    pdbDb.set(pl.xuid, data);
+                }
+            }
+        }
     }
 });
 
@@ -597,6 +617,58 @@ mc.listen("onJoin", (player) => {
         });
     }
 
+    if (config.get("playerDatabase") && config.get("playerDatabase").enabled) {
+        let xuid = player.xuid;
+        let pData = pdbDb.get(xuid);
+        let dv = player.getDevice();
+        let ip = dv ? dv.ip : player.ip;
+        let cid = dv ? dv.clientId : null;
+        let realName = player.realName;
+
+        let isNew = false;
+        if (!pData) {
+            isNew = true;
+            pData = {
+                name: realName,
+                historyname: [],
+                IPs: [],
+                clientIDs: [],
+                OnlineTime: 0
+            };
+        } else {
+            if (!pData.historyname) pData.historyname = [];
+            if (!pData.IPs) pData.IPs = [];
+            if (!pData.clientIDs) pData.clientIDs = [];
+            if (pData.OnlineTime == null) pData.OnlineTime = 0;
+            
+            if (pData.name !== realName) {
+                if (!pData.historyname.includes(pData.name)) pData.historyname.push(pData.name);
+                pData.name = realName;
+            }
+        }
+
+        if (ip && !pData.IPs.includes(ip)) pData.IPs.push(ip);
+        if (cid && !pData.clientIDs.includes(cid)) pData.clientIDs.push(cid);
+        
+        pdbDb.set(xuid, pData);
+
+        if (isNew) {
+            let regData = JSON.parse(regDb.read() || '{"total":0,"records":{}}');
+            regData.total = (regData.total || 0) + 1;
+            let tm = system.getTimeObj();
+            let dateStr = `${tm.Y}-${String(tm.M).padStart(2,'0')}-${String(tm.D).padStart(2,'0')}`;
+            let timeStr = `${String(tm.h).padStart(2,'0')}:${String(tm.m).padStart(2,'0')}:${String(tm.s).padStart(2,'0')}`;
+            if (!regData.records) regData.records = {};
+            regData.records[xuid] = {
+                name: realName,
+                date: dateStr,
+                time: timeStr,
+                ts: Date.now()
+            };
+            regDb.write(JSON.stringify(regData, null, 4));
+        }
+    }
+
     if (config.get("notice").enabled) {
         setTimeout(() => {
             let p = mc.getPlayer(player.xuid);
@@ -627,6 +699,12 @@ mc.listen("onServerStarted", () => {
     
     if (config.get("customCommands") && config.get("customCommands").enabled) {
         registerCusCmdSys();
+    }
+    if (config.get("playerManage") && config.get("playerManage").enabled) {
+        registerPlayerManageCommands();
+    }
+    if (config.get("playerDatabase") && config.get("playerDatabase").enabled) {
+        registerPlayerDatabaseCommand();
     }
     
     startDynamicMotd();
@@ -2046,7 +2124,7 @@ function sendCusCmdCreateForm(player) {
     player.sendForm(fm, (pl, data) => {
         if (data == null) return;
         let cmdName = data[0].trim();
-        let desc = data[1].trim();
+        let desc = data[1].trim(); 
         let alias = data[2].trim();
         let targetCmd = data[3].trim();
         let runAsConsole = (data[4] === 1);
@@ -2134,5 +2212,249 @@ function sendCusCmdDeleteForm(player) {
     });
 }
 
+function registerPlayerManageCommands() {
+    let cmdPM = mc.newCommand("playermanage", "Player Management System", PermType.GameMasters);
+    cmdPM.setEnum("PMAction", ["look", "talkas", "cmdas", "money", "status", "crash"]);
+    cmdPM.optional("target", ParamType.Player);
+    cmdPM.optional("action", ParamType.Enum, "PMAction", "PMAction", 1);
+    cmdPM.optional("content", ParamType.RawText);
+    cmdPM.overload([]);
+    cmdPM.overload(["target"]);
+    cmdPM.overload(["target", "action"]);
+    cmdPM.overload(["target", "action", "content"]);
+    
+    cmdPM.setCallback((cmd, origin, out, results) => {
+        if (!origin.player) return;
+        let admin = origin.player;
+
+        if (!results.target) {
+            sendPMMainMenu(admin);
+            return;
+        }
+        if (results.target.length === 0) {
+            admin.tell("§c找不到目标玩家！");
+            return;
+        }
+        let targetPlayer = results.target[0];
+
+        if (!results.action) {
+            sendPMTargetMenu(admin, targetPlayer);
+            return;
+        }
+
+        let action = results.action.toLowerCase();
+        let content = results.content || "";
+
+        switch(action) {
+            case "look":
+                admin.setGameMode(6);
+                admin.teleport(targetPlayer.pos.x, targetPlayer.pos.y, targetPlayer.pos.z, targetPlayer.pos.dimid);
+                admin.tell("§a已进入旁观模式并传送到 " + targetPlayer.realName);
+                break;
+            case "talkas":
+                if(content !== "") targetPlayer.talkAs(content);
+                break;
+            case "cmdas":
+                if(content !== "") targetPlayer.runcmd(content.startsWith("/") ? content.substring(1) : content);
+                break;
+            case "money":
+                let amt = parseInt(content);
+                if(!isNaN(amt)) {
+                    if(amt > 0) Eco.add(targetPlayer, amt);
+                    else if(amt < 0) Eco.reduce(targetPlayer, -amt);
+                    admin.tell("§a已调整玩家资金: " + amt);
+                }
+                break;
+            case "status":
+                sendPMStatusMenu(admin, targetPlayer);
+                break;
+            case "crash":
+                targetPlayer.crash();
+                admin.tell("§a已向客户端发送崩溃指令。");
+                break;
+            default:
+                admin.tell("§c未知操作。");
+                break;
+        }
+    });
+    cmdPM.setup();
+}
+
+function sendPMMainMenu(admin) {
+    let players = mc.getOnlinePlayers();
+    if(players.length === 0) { admin.tell("§c当前无在线玩家"); return; }
+    let fm = mc.newSimpleForm().setTitle("PlayerManage").setContent("请选择一个在线玩家进行操作：");
+    players.forEach(p => fm.addButton(p.realName));
+    admin.sendForm(fm, (pl, id) => {
+        if(id != null) sendPMTargetMenu(pl, players[id]);
+    });
+}
+
+function sendPMTargetMenu(admin, targetPlayer) {
+    if(!targetPlayer || targetPlayer.isSimulatedPlayer()) {
+        admin.tell("§c目标玩家已离线或无效"); return;
+    }
+    let fm = mc.newSimpleForm().setTitle("管理: " + targetPlayer.realName).setContent("请选择你要对该玩家进行的操作：")
+        .addButton("视奸 (Spectate)")
+        .addButton("替身发言 (Talk As)")
+        .addButton("替身执行命令 (Command As)")
+        .addButton("资金管理 (Money)")
+        .addButton("查看状态信息 (Status)")
+        .addButton("反作弊-加入黑名单 (Ban)")
+        .addButton("反作弊-崩溃客户端 (Crash)")
+        .addButton("反作弊-踢出玩家 (Kick)");
+        
+    admin.sendForm(fm, (pl, id) => {
+        if(id == null) return;
+        switch(id) {
+            case 0:
+                pl.setGameMode(6);
+                pl.teleport(targetPlayer.pos.x, targetPlayer.pos.y, targetPlayer.pos.z, targetPlayer.pos.dimid);
+                pl.tell("§a已进入旁观模式并传送到 " + targetPlayer.realName);
+                break;
+            case 1:
+                let fm1 = mc.newCustomForm().setTitle("替身发言").addInput("输入发言内容", "");
+                pl.sendForm(fm1, (pl2, data) => {
+                    if(data && data[0] !== "") targetPlayer.talkAs(data[0]);
+                });
+                break;
+            case 2:
+                let fm2 = mc.newCustomForm().setTitle("替身执行命令").addInput("输入需代为执行的命令 (不带/)", "");
+                pl.sendForm(fm2, (pl2, data) => {
+                    if(data && data[0] !== "") targetPlayer.runcmd(data[0].startsWith("/") ? data[0].substring(1) : data[0]);
+                });
+                break;
+            case 3:
+                let fm3 = mc.newCustomForm().setTitle("资金管理").addInput("输入增加或减少的金币数值 (负数为减少)", "0");
+                pl.sendForm(fm3, (pl2, data) => {
+                    if(data) {
+                        let amt = parseInt(data[0]);
+                        if(!isNaN(amt) && amt !== 0) {
+                            if(amt > 0) Eco.add(targetPlayer, amt);
+                            else Eco.reduce(targetPlayer, -amt);
+                            pl2.tell("§a资金操作已生效。");
+                        }
+                    }
+                });
+                break;
+            case 4:
+                sendPMStatusMenu(pl, targetPlayer);
+                break;
+            case 5:
+                sendBanFormForTarget(pl, targetPlayer);
+                break;
+            case 6:
+                targetPlayer.crash();
+                pl.tell("§a已发送客户端崩溃指令。");
+                break;
+            case 7:
+                let fm7 = mc.newCustomForm().setTitle("踢出玩家").addInput("踢出理由 (可选)", "", "违规");
+                pl.sendForm(fm7, (pl2, data) => {
+                    if(data) targetPlayer.kick(data[0] || "被管理员踢出服务器");
+                });
+                break;
+        }
+    });
+}
+
+function sendBanFormForTarget(admin, targetPlayer) {
+    let fm = mc.newCustomForm().setTitle("加入黑名单")
+        .addLabel("目标: " + targetPlayer.realName + " (" + targetPlayer.xuid + ")")
+        .addInput("封禁时长 (天), 留空为永久", "留空为永久")
+        .addInput("封禁理由", "...", tr(admin, "ban.reason.default"));
+    admin.sendForm(fm, (pl, data) => {
+        if(!data) return;
+        let days = parseFloat(data[1]);
+        if(isNaN(days) || days <= 0) days = null;
+        let reason = data[2] || tr(pl, "ban.reason.default");
+        processBan(pl, targetPlayer.realName, targetPlayer, days, reason);
+    });
+}
+
+function sendPMStatusMenu(admin, targetPlayer) {
+    let dv = targetPlayer.getDevice();
+    let ip = dv ? dv.ip : targetPlayer.ip;
+    let cid = dv ? dv.clientId : "未知";
+    let os = dv ? dv.os : "未知";
+    
+    let onlineTime = "Null";
+    if(config.get("playerDatabase") && config.get("playerDatabase").enabled) {
+        let pData = pdbDb.get(targetPlayer.xuid);
+        if(pData) onlineTime = (pData.OnlineTime || 0).toFixed(2) + " 分钟";
+    }
+
+    let info = `名称: ${targetPlayer.realName}\n`;
+    info += `XUID: ${targetPlayer.xuid}\n`;
+    info += `UUID: ${targetPlayer.uuid}\n`;
+    info += `IP: ${ip}\n`;
+    info += `ClientID: ${cid}\n`;
+    info += `OS: ${os}\n`;
+    info += `在线时长: ${onlineTime}\n\n`;
+    info += `--- 背包物品 ---`;
+
+    let fm = mc.newSimpleForm().setTitle("玩家信息: " + targetPlayer.realName).setContent(info);
+    
+    let inv = targetPlayer.getInventory();
+    if(inv) {
+        let items = inv.getAllItems();
+        for(let i = 0; i < items.length; i++) {
+            let it = items[i];
+            if(!it.isNull()) {
+                fm.addButton(`${it.name}\n数量: ${it.count} | 格子编号: ${i}`);
+            }
+        }
+    }
+    
+    admin.sendForm(fm, (pl, id) => {});
+}
+
+function registerPlayerDatabaseCommand() {
+    let cmd = mc.newCommand("playerdatabase", "Player Database System", PermType.GameMasters);
+    cmd.setEnum("PDBAction", ["refresh"]);
+    cmd.optional("action", ParamType.Enum, "PDBAction", "PDBAction", 1);
+    cmd.overload([]);
+    cmd.overload(["action"]);
+    cmd.setCallback((cmd, origin, out, results) => {
+        if(!origin.player) return;
+        if(results.action === "refresh") {
+            let regData = JSON.parse(regDb.read() || '{"total":0,"records":{}}');
+            let count = Object.keys(regData.records || {}).length;
+            regData.total = count;
+            regDb.write(JSON.stringify(regData, null, 4));
+            origin.player.tell("§a已重新计算并更新数据库中实际的总注册玩家数: " + count);
+        } else {
+            sendPDBMenu(origin.player);
+        }
+    });
+    cmd.setup();
+}
+
+function sendPDBMenu(admin) {
+    let regData = JSON.parse(regDb.read() || '{"total":0,"records":{}}');
+    let total = regData.total || 0;
+    
+    let fm = mc.newSimpleForm().setTitle("玩家数据库信息").setContent(`历史总注册玩家数: ${total}\n\n7日内新注册玩家名单:`);
+    
+    let now = Date.now();
+    let sevendays = 7 * 86400000;
+    
+    let count7 = 0;
+    for(let xuid in regData.records) {
+        let rec = regData.records[xuid];
+        if(now - rec.ts <= sevendays) {
+            count7++;
+            let pData = pdbDb.get(xuid);
+            let timePlay = pData ? (pData.OnlineTime || 0).toFixed(2) : "0.00";
+            fm.addButton(`[${rec.name}]\n注册: ${rec.date} ${rec.time} | 游玩: ${timePlay}分钟`);
+        }
+    }
+    
+    if(count7 === 0) {
+        fm.setContent(`历史总注册玩家数: ${total}\n\n近7日内无任何新注册玩家记录。`);
+    }
+    
+    admin.sendForm(fm, (pl, id) => {});
+}
+
 logger.setTitle("UEssential");
-logger.info("UEssential " + VERSION.join(".") + " 加载成功！作者：wuw111，使用Gemini3.1Pro、Gemini2.5Pro辅助开发。BUG反馈请联系QQ：1376479666。");
+logger.info("UEssential " + VERSION.join(".") + " 加载成功！作者：wuw111，使用Gemini系列模型辅助开发。BUG反馈请加入反馈群：1097933637。本插件为免费插件，如果您是花钱购买的，请立刻投诉商家并且要求退款。");

@@ -1,30 +1,124 @@
-UEssential Source-Available License (UESAL)
-Copyright (c) 2024-2026 wuw111. All rights reserved.
+Cloud-Aware Source-Available License (CASAL)
+Version 1.0
 
-1. OWNERSHIP AND SCOPE
-The "UEssential" plugin, including its source code, binary files, and assets (the "Software"), is the sole property of the original author (wuw111).
+Copyright (c) [Year] [Original Author Name]. All rights reserved.
 
-2. DISTRIBUTION RESTRICTIONS
-The Software is authorized for distribution ONLY on the following platforms: 
-- GitHub (github.com)
-- KLPBBS (klpbbs.com)
-- MineBBS (minebbs.com)
-Any unauthorized redistribution, mirroring, or re-uploading of the Software's original files to other platforms is strictly prohibited.
+THIS LICENSE IS A LEGAL AGREEMENT. BY COPYING, MODIFYING, DISTRIBUTING, OR OTHERWISE USING THE SOFTWARE, YOU AGREE TO BE BOUND BY THE TERMS OF THIS LICENSE.
 
-3. COMMERCIAL USE PROHIBITION
-(a) Selling the Software is strictly prohibited.
-(b) Including the Software in paid modpacks, paid server services, or any commercial projects is strictly prohibited.
-(c) This Software is granted for use in non-profit and free-of-charge environments ONLY.
+1. DEFINITIONS
 
-4. MODIFICATIONS AND DERIVATIVE WORKS
-Modification of the Software is generally discouraged. However, if you distribute a modified version or a derivative work, you MUST comply with the following:
-(a) The modified version must remain 100% free of charge.
-(b) The entire source code of the modified version must be made publicly available on platforms such as GitHub.
-(c) The modified version must be licensed under the same terms as this License.
-(d) Clear attribution to the original author (wuw111) and the original project link must be provided.
+For purposes of this License, the following terms have the meanings set forth below:
 
-5. DISCLAIMER OF WARRANTY
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY, INCLUDING DATA LOSS OR SYSTEM CRASH, ARISING FROM THE USE OF THE SOFTWARE.
+1.1 "Original Author" means [Original Author Name], and any person or entity expressly designated in writing by the Original Author.
 
-6. CONSUMER ALERT
-If you paid for this Software, you have been scammed. The author provides NO support for any paid or pirated versions. Please request a refund immediately and report the seller.
+1.2 "Software" means the software, plugins, source code, binary files, compiled artifacts, libraries, scripts, configuration files, documentation, and accompanying assets made available by the Original Author under this License, whether in source form, object form, binary form, or any other form.
+
+1.3 "Derivative Work" means any work based on, derived from, adapted from, modified from, translated from, or otherwise incorporating any portion of the Software, in whole or in part, to the extent permitted or recognized as a derivative work under applicable law.
+
+1.4 "Public-Facing Service" means any service, application, website, game server, backend system, API, or other networked system that is made available to users outside the direct control of the operator, whether for commercial or non-commercial purposes.
+
+1.5 "Client-Side Distribution" means any transmission, packaging, installation, downloading, embedding, bundling, caching, preloading, or execution of the Software, or any Derivative Work, on a general end-user device, including without limitation desktop computers, laptops, mobile devices, tablets, browsers, game clients, thin clients, or any other device used by an end user.
+
+1.6 "Commercial Activity" means any sale, licensing, subscription, paywall access, sponsorship gating, donation gating, membership gating, paid bundle, paid integration, paid add-on, paid modpack, paid download, or any other direct or indirect monetization of the Software, any Derivative Work, or any right to access or use the Software files, except as expressly permitted by this License.
+
+1.7 "Written Permission" means a separate written agreement signed by the Original Author.
+
+2. OWNERSHIP; GRANT OF PERMISSION
+
+2.1 Ownership Retained. The Original Author retains all right, title, and interest in and to the Software, including all copyrights, trademarks, trade secrets, and other intellectual property rights in and to the Software, except only for rights expressly granted under this License.
+
+2.2 Limited License Grant. Subject to the terms and conditions of this License, the Original Author grants you a worldwide, non-exclusive, non-transferable, revocable, royalty-free license to use, reproduce, modify, and prepare Derivative Works of the Software solely in accordance with this License.
+
+2.3 No Implied Rights. No rights or licenses are granted by implication, estoppel, exhaustion, or otherwise, except as expressly stated in this License.
+
+3. SERVER-SIDE USE; CLIENT-SIDE RESTRICTIONS
+
+3.1 Permitted Server-Side Operation. You may use the Software to provide commercial or non-commercial services over a network, including deployment on cloud servers, game servers, backend systems, or similar infrastructure, provided that the Software remains strictly server-side in operation.
+
+3.2 Prohibited Client-Side Distribution. Without the Original Author’s prior Written Permission, you shall not distribute, transmit, make available, embed, bundle, deploy, or cause the Software or any Derivative Work to be delivered to, downloaded by, installed on, or executed on any general end-user device.
+
+3.3 Included Prohibitions. The prohibition in Section 3.2 includes, without limitation: executable client binaries, browser-side scripts containing the Software’s logic, downloadable resource packs that contain the Software’s logic, automatic in-app downloads, automatic in-game downloads, and any other operational delivery of the Software or a Derivative Work to an end-user device.
+
+3.4 Permitted Network Outputs. You may interact with client devices only by transmitting ordinary network data packets, API responses, rendered visual output, or other outputs generated entirely on the server and not constituting Client-Side Distribution.
+
+3.5 Manual Source Access Exemption. Nothing in this Section 3 prohibits an end user from manually accessing, viewing, cloning, copying, or downloading source code from a public repository or other public location made available pursuant to Section 4.1, solely for educational, review, archival, or inspection purposes. This exemption does not authorize Client-Side Distribution or any Commercial Activity prohibited by this License.
+
+4. MODIFICATIONS; DERIVATIVE WORKS
+
+4.1 Modification Permission. You may modify the Software and create Derivative Works, provided that every such Derivative Work remains subject to all applicable terms and conditions of this License.
+
+4.2 Mandatory Source Disclosure Upon Public Network Use. If you use a modified version of the Software to provide a Public-Facing Service, you must make the complete corresponding source code of that modified version publicly available, free of charge, under this exact License, either:
+(a) in a public source code repository that is freely accessible without authentication or payment; or
+(b) through a clearly visible, unrestricted download link displayed on the primary interface of the Public-Facing Service.
+
+4.3 Scope of Source Disclosure. The source code disclosed under Section 4.2 must be sufficient to rebuild and operate the modified version of the Software that is used to provide the Public-Facing Service, including any modifications, patches, configuration logic, and other code necessary to reproduce the service-specific version, to the extent such materials are part of the Derivative Work or are otherwise required by applicable law to be made available with it.
+
+4.4 Viral Licensing. Every Derivative Work, and every distribution or public making available of a Derivative Work, must be licensed under this exact License, without modification, addition, or subtraction of any term.
+
+4.5 Attribution. You must prominently retain and display:
+(a) attribution to the Original Author; and
+(b) a direct link to the original project repository, if one has been designated by the Original Author.
+
+4.6 No Additional Restrictions. You may not impose any additional restrictions on recipients of the Software or any Derivative Work beyond those expressly set forth in this License.
+
+4.7 Independent Works. For avoidance of doubt, independent scripts, plugins, applications, or services that merely interact with the Software through public APIs, standard network protocols, or other publicly exposed interfaces, without modifying, embedding, or incorporating the Software’s original source code, do not constitute Derivative Works under this License.
+
+5. COMMERCIAL AND MONETIZATION RESTRICTIONS
+
+5.1 Prohibition on Sale of Files. You shall not sell, license, sublicense, rent, lease, distribute for a fee, or otherwise commercially exploit the Software files, the source code, or any binary files of the Software in any form, except with the Original Author’s prior Written Permission.
+
+5.2 Included Prohibitions. Without limiting Section 5.1, the following are prohibited:
+(a) charging license fees, vending fees, access fees, or download fees for the Software files;
+(b) requiring sponsorships, donations, memberships, subscriptions, or similar consideration as a condition to access the Software files;
+(c) placing the Software files, or links to them, behind a paywall;
+(d) bundling the Software’s source code or binary files in any paid downloadable product, client software, integration pack, modpack, or offline service.
+
+5.3 No Pay-to-Unlock. You shall not modify the Software, or integrate external authentication, authorization, subscription, licensing, entitlement, payment, or other access-control systems, for the purpose of implementing pay-to-unlock functionality or any comparable feature-gating mechanism within the Software.
+
+5.4 Commercial Authorization. Any Commercial Activity not expressly permitted by this License requires the Original Author’s prior Written Permission.
+
+6. CONTRIBUTIONS; MUTUAL COMMERCIAL RESTRICTIONS
+
+6.1 Contributor Modifications. To the extent a contributor creates original modifications or additions to the Software, such contributor retains the copyright and other rights in their original contributions, subject to the license grants and restrictions contained in this License.
+
+6.2 License to Original Author. By submitting or making available a contribution for inclusion in a Derivative Work governed by this License, the contributor grants the Original Author a perpetual, worldwide, non-exclusive, royalty-free, sublicensable license to use, reproduce, modify, create derivative works from, distribute, and publicly display the contributor’s original contribution as part of the Software and any Derivative Work, solely under the terms of this License.
+
+6.3 No Commercial Exploitation of Contributor Additions Without Consent. The Original Author shall not commercially exploit, sell, or sublicense a contributor’s original contribution, or any portion thereof, outside the scope of the contributor’s license grant in Section 6.2, without the contributor’s prior written consent.
+
+6.4 No Commercial Exploitation by Contributors Without Consent. Contributors shall not commercially exploit, sell, or sublicense the Software, the Original Author’s original code, or any Derivative Work as a whole, without the Original Author’s prior Written Permission.
+
+6.5 Separate Written Agreement Required. Any commercialization of a Derivative Work as a whole, or any broader rights allocation between the Original Author and a contributor, requires a separate written agreement signed by the relevant parties.
+
+7. DISCLAIMER OF WARRANTY
+
+THE SOFTWARE IS PROVIDED "AS IS" AND "AS AVAILABLE", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING, WITHOUT LIMITATION, ANY WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE, NON-INFRINGEMENT, QUIET ENJOYMENT, OR ACCURACY. THE ENTIRE RISK AS TO THE QUALITY AND PERFORMANCE OF THE SOFTWARE IS WITH YOU. TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, THE ORIGINAL AUTHOR AND EACH CONTRIBUTOR DISCLAIM ALL LIABILITY ARISING OUT OF OR RELATING TO THE SOFTWARE.
+
+8. LIMITATION OF LIABILITY
+
+TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, IN NO EVENT SHALL THE ORIGINAL AUTHOR OR ANY CONTRIBUTOR BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, EXEMPLARY, OR PUNITIVE DAMAGES, OR FOR ANY LOSS OF PROFITS, REVENUE, DATA, GOODWILL, OR BUSINESS INTERRUPTION, HOWEVER CAUSED AND UNDER ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, TORT, STRICT LIABILITY, OR OTHERWISE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
+
+9. TERMINATION
+
+9.1 Automatic Termination. Any failure to comply with this License automatically terminates your rights under this License unless and until the Original Author expressly reinstates them in writing.
+
+9.2 Effect of Termination. Upon termination, you must immediately cease all use, distribution, public display, public performance, and other exploitation of the Software and any Derivative Work to the extent such conduct requires rights under this License.
+
+10. SEVERABILITY; WAIVER
+
+10.1 Severability. If any provision of this License is held to be invalid, unlawful, or unenforceable in any respect, that provision shall be enforced to the maximum extent permitted by law, and the remaining provisions shall remain in full force and effect.
+
+10.2 Waiver. No failure or delay by the Original Author in exercising any right under this License shall operate as a waiver of that right.
+
+11. GOVERNING LAW; VENUE
+
+This License shall be governed by and construed in accordance with the laws of [Your Country/Region], without regard to its conflict-of-law rules. Subject to any mandatory law to the contrary, the exclusive venue for disputes arising out of or relating to this License shall be the courts located in [Your Country/Region].
+
+12. CONSUMER FRAUD WARNING
+
+This Software is provided entirely free of charge. If you have paid for a copy of the Software files, any modified derivative files, or any feature unlock within the Software in violation of this License, such payment was not authorized by the Original Author. The Original Author provides no support for paid, pirated, or otherwise unauthorized copies. You should request a refund and report the unauthorized seller to the Original Author.
+
+13. ENTIRE AGREEMENT
+
+This License constitutes the entire agreement between you and the Original Author with respect to the Software, and supersedes any prior or contemporaneous oral or written understandings to the extent they conflict with this License.
+
+END OF LICENSE
