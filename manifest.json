@@ -2,7 +2,7 @@
     "entry": "UEssential.js",
     "name": "UEssential",
     "type": "lse-quickjs",
-    "version": "1.1.0",
+    "version": "1.1.1",
     "author": "wuw111",
     "description": "UEssential，一款基岩版服务器基础插件",
     "extraInfo": {},

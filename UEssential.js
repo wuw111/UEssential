@@ -1,19 +1,17 @@
 /*-----------------------------------------------------------------------
- * UEssential 基础生存插件 - v1.1.0
- * Copyright (c) 2024-2026 wuw111. All rights reserved.
- * 
- * [授权声明 - CASAL v1.0]
- * 1. 本项目基于 CASAL v1.0 协议授权。官方发布渠道仅限 GitHub、KLPBBS、MineBBS，禁止未经许可的转载。
- * 2. 运行环境：本插件仅限服务端运行，严禁将本体代码或逻辑分发至客户端（如JS源码内容等）。
- * 3. 允许二次开发，但在公网服务器运行修改版时，必须公开完整源码并沿用 CASAL 协议。
- * 4. 商业：允许商业服务器部署使用。但【严禁】直接售卖插件、将其加入付费整合包，或在商业服务器内将插件内功能设为“付费解锁”。
- * 5. 欺诈警告：本插件永久免费。若您为获取插件文件或解锁其内部功能而付费，说明您已被骗，请立即举报。
- * 
- * 详细条款、例外情况及授权定义请参阅项目根目录下的 LICENSE 文件。
- *-----------------------------------------------------------------------*/
+UEssential 基础生存插件 - v1.1.1
+Copyright (c) 2024-2026 wuw111. All rights reserved.
+[授权声明 - CASAL v1.0]
+本项目基于 CASAL v1.0 协议授权。官方发布渠道仅限 GitHub、KLPBBS、MineBBS，禁止未经许可的转载。
+运行环境：本插件仅限服务端运行，严禁将本体代码或逻辑分发至客户端（如JS源码内容等）。
+允许二次开发，但在公网服务器运行修改版时，必须公开完整源码并沿用 CASAL 协议。
+商业：允许商业服务器部署使用。但【严禁】直接售卖插件、将其加入付费整合包，或在商业服务器内将插件内功能设为“付费解锁”。
+欺诈警告：本插件永久免费。若您为获取插件文件或解锁其内部功能而付费，说明您已被骗，请立即举报。
+详细条款、例外情况及授权定义请参阅项目根目录下的 LICENSE 文件。
+-----------------------------------------------------------------------*/
 
 const PLUGIN_NAME = "UEssential";
-const VERSION = [1, 1, 0];
+const VERSION = [1, 1, 1];
 const PREFIX = "§b§l[UEssential]§r ";
 const DIR_PATH = "plugins/" + PLUGIN_NAME;
 const LANG_PATH = DIR_PATH + "/lang";
@@ -336,6 +334,7 @@ function csvLog(event, playerStr, dataStr) {
 }
 
 let currentTick = 0;
+let lastOnlineTimeCalcTimestamp = Date.now();
 let tpaQueue = {}; 
 let tprCooldowns = {};
 
@@ -408,6 +407,11 @@ function sendMsg(player, key, obj) {
     let msg = PREFIX + tr(player, key, obj);
     if (player && player.tell) player.tell(msg);
     else logger.info(msg.replace(/§[0-9a-fk-or]/g, ""));
+}
+
+function getPureIp(ipStr) {
+    if (!ipStr) return "";
+    return ipStr.split(':')[0];
 }
 
 const Util = {
@@ -546,14 +550,16 @@ mc.listen("onTick", () => {
         }
 
         if (config.get("playerDatabase") && config.get("playerDatabase").enabled) {
-            let inc = 0.95;
+            let now = Date.now();
+            let inc = 1.05; 
             let tpsCfg = config.get("tps");
             if (tpsCfg && tpsCfg.enabled) {
-                let tpsStr = getAvgTps(60); 
-                let tps = parseFloat(tpsStr);
-                if (!isNaN(tps) && tps > 0) inc = 20 / tps;
-                else inc = 1.0;
+                if (lastOnlineTimeCalcTimestamp > 0) {
+                    inc = (now - lastOnlineTimeCalcTimestamp) / 60000;
+                }
             }
+            lastOnlineTimeCalcTimestamp = now;
+
             let players = mc.getOnlinePlayers();
             for (let pl of players) {
                 if (pl.isSimulatedPlayer()) continue;
@@ -580,7 +586,7 @@ mc.listen("onPlayerDie", (player, source) => {
 
 mc.listen("onPreJoin", (player) => {
     if (config.get("ban").enabled) {
-        let res = checkLocalBan(player.xuid, player.name, player.ip, null);
+        let res = checkLocalBan(player.xuid, player.name, getPureIp(player.ip), null);
         if (res.banned) {
             logger.warn(`[BanSystem] 本地黑名单拦截: ${player.name} (${player.xuid}) -> 理由: ${res.reason}`);
             player.kick(tr(player, "ban.kick.local", { reason: res.reason }));
@@ -595,7 +601,7 @@ mc.listen("onJoin", (player) => {
     if (config.get("ban").enabled) {
         let dv = player.getDevice();
         let clientId = dv ? dv.clientId : null;
-        let ip = dv ? dv.ip : player.ip;
+        let ip = getPureIp(dv ? dv.ip : player.ip);
         
         let res = checkLocalBan(player.xuid, player.realName, ip, clientId);
         if (res.banned) {
@@ -621,7 +627,7 @@ mc.listen("onJoin", (player) => {
         let xuid = player.xuid;
         let pData = pdbDb.get(xuid);
         let dv = player.getDevice();
-        let ip = dv ? dv.ip : player.ip;
+        let ip = getPureIp(dv ? dv.ip : player.ip);
         let cid = dv ? dv.clientId : null;
         let realName = player.realName;
 
@@ -841,7 +847,6 @@ function startTprSearch(player, cost, dimCfg, attempts, originalPos, cfg) {
         }
     }, cfg.loadDelayMs);
 }
-
 
 function getAvgTps(expectedSeconds) {
     if (tickTotalCount < 2) return (20.00).toFixed(2);
@@ -1139,7 +1144,7 @@ function processBan(admin, targetStr, targetPlayer, days, reason) {
         info.xuid = targetPlayer.xuid;
         info.name = targetPlayer.realName;
         let dv = targetPlayer.getDevice();
-        info.ip = dv ? dv.ip : targetPlayer.ip;
+        info.ip = getPureIp(dv ? dv.ip : targetPlayer.ip);
         info.clientId = dv ? dv.clientId : null;
     } else {
         if (/^\d{16}$/.test(targetStr)) info.xuid = targetStr;
@@ -2033,7 +2038,6 @@ function registerLangCommands() {
     cmdLang.setup();
 }
 
-
 function setupDynamicCmd(cmdName, cmdData) {
     let dynCmd = mc.newCommand(cmdName, cmdData.desc || "自定义映射命令", PermType.Any);
     if (cmdData.alias && cmdData.alias !== "") {
@@ -2373,7 +2377,7 @@ function sendBanFormForTarget(admin, targetPlayer) {
 
 function sendPMStatusMenu(admin, targetPlayer) {
     let dv = targetPlayer.getDevice();
-    let ip = dv ? dv.ip : targetPlayer.ip;
+    let ip = getPureIp(dv ? dv.ip : targetPlayer.ip);
     let cid = dv ? dv.clientId : "未知";
     let os = dv ? dv.os : "未知";
     
@@ -2390,22 +2394,55 @@ function sendPMStatusMenu(admin, targetPlayer) {
     info += `ClientID: ${cid}\n`;
     info += `OS: ${os}\n`;
     info += `在线时长: ${onlineTime}\n\n`;
-    info += `--- 背包物品 ---`;
+    info += `--- 背包物品 (点击审查NBT) ---`;
 
     let fm = mc.newSimpleForm().setTitle("玩家信息: " + targetPlayer.realName).setContent(info);
     
     let inv = targetPlayer.getInventory();
+    let slotMap = [];
     if(inv) {
         let items = inv.getAllItems();
         for(let i = 0; i < items.length; i++) {
             let it = items[i];
             if(!it.isNull()) {
                 fm.addButton(`${it.name}\n数量: ${it.count} | 格子编号: ${i}`);
+                slotMap.push(i);
             }
         }
     }
     
-    admin.sendForm(fm, (pl, id) => {});
+    admin.sendForm(fm, (pl, id) => {
+        if (id == null) return;
+        
+        let onlinePs = mc.getOnlinePlayers();
+        let stillOnline = onlinePs.find(p => p.xuid === targetPlayer.xuid);
+        if (!stillOnline) {
+            pl.tell("§c目标玩家已离线，无法获取背包数据！");
+            return;
+        }
+
+        let targetInv = stillOnline.getInventory();
+        if (targetInv) {
+            let slotIdx = slotMap[id];
+            let clickedItem = targetInv.getItem(slotIdx);
+            
+            if (clickedItem && !clickedItem.isNull()) {
+                let nbt = clickedItem.getNbt();
+                let nbtStr = nbt ? nbt.toString(4) : "该物品无 NBT 数据附着";
+                let nbtFm = mc.newSimpleForm()
+                    .setTitle(`物品 NBT 审查 [插槽 ${slotIdx}]`)
+                    .setContent(`物品: ${clickedItem.name}\n数量: ${clickedItem.count}\n类型ID: ${clickedItem.type}\n\n==== NBT 结构 ====\n${nbtStr}`)
+                    .addButton("返回上级菜单");
+                
+                pl.sendForm(nbtFm, (pl2, id2) => {
+                    sendPMStatusMenu(pl2, stillOnline);
+                });
+            } else {
+                pl.tell("§c该槽位物品已被移动或变为空！");
+                sendPMStatusMenu(pl, stillOnline);
+            }
+        }
+    });
 }
 
 function registerPlayerDatabaseCommand() {
@@ -2455,6 +2492,29 @@ function sendPDBMenu(admin) {
     
     admin.sendForm(fm, (pl, id) => {});
 }
+
+ll.export(() => {
+    if (!config.get("tps") || !config.get("tps").enabled) return null;
+    return parseFloat(getAvgTps(60));
+}, "UEssential", "getTps1Min");
+
+ll.export(() => {
+    if (!config.get("tps") || !config.get("tps").enabled) return null;
+    return parseFloat(getAvgTps(1));
+}, "UEssential", "getTpsInstant");
+
+ll.export((xuid) => {
+    if (!config.get("playerDatabase") || !config.get("playerDatabase").enabled) return null;
+    if (!xuid) return null;
+    let pData = pdbDb.get(xuid);
+    return pData ? (pData.OnlineTime || 0) : 0;
+}, "UEssential", "getOnlineTime");
+
+ll.export((xuid, name, ip, clientId) => {
+    if (!config.get("ban") || !config.get("ban").enabled) return null;
+    let pureIp = getPureIp(ip); 
+    return checkLocalBan(xuid, name, pureIp, clientId).banned;
+}, "UEssential", "isBanned");
 
 logger.setTitle("UEssential");
 logger.info("UEssential " + VERSION.join(".") + " 加载成功！作者：wuw111，使用Gemini系列模型辅助开发。BUG反馈请加入反馈群：1097933637。本插件为免费插件，如果您是花钱购买的，请立刻投诉商家并且要求退款。");
