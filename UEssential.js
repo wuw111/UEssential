@@ -1,17 +1,17 @@
 /*-----------------------------------------------------------------------
-UEssential 基础生存插件 - v1.1.1
+UEssential 基础生存插件 - v1.1.2
 Copyright (c) 2024-2026 wuw111. All rights reserved.
 [授权声明 - CASAL v1.0]
 本项目基于 CASAL v1.0 协议授权。官方发布渠道仅限 GitHub、KLPBBS、MineBBS，禁止未经许可的转载。
 运行环境：本插件仅限服务端运行，严禁将本体代码或逻辑分发至客户端（如JS源码内容等）。
 允许二次开发，但在公网服务器运行修改版时，必须公开完整源码并沿用 CASAL 协议。
 商业：允许商业服务器部署使用。但【严禁】直接售卖插件、将其加入付费整合包，或在商业服务器内将插件内功能设为“付费解锁”。
-欺诈警告：本插件永久免费。若您为获取插件文件或解锁其内部功能而付费，说明您已被骗，请立即举报。
 详细条款、例外情况及授权定义请参阅项目根目录下的 LICENSE 文件。
+温馨提示：本插件永久免费。若您为下载插件文件或为了解锁其内部功能而付费，说明您已被骗，请立即举报。
 -----------------------------------------------------------------------*/
 
 const PLUGIN_NAME = "UEssential";
-const VERSION = [1, 1, 1];
+const VERSION = [1, 1, 2];
 const PREFIX = "§b§l[UEssential]§r ";
 const DIR_PATH = "plugins/" + PLUGIN_NAME;
 const LANG_PATH = DIR_PATH + "/lang";
@@ -586,11 +586,16 @@ mc.listen("onPlayerDie", (player, source) => {
 
 mc.listen("onPreJoin", (player) => {
     if (config.get("ban").enabled) {
+        logger.info(`开始进行 ${player.name} 本地黑名单检查 (PreJoin)`);
         let res = checkLocalBan(player.xuid, player.name, getPureIp(player.ip), null);
         if (res.banned) {
-            logger.warn(`[BanSystem] 本地黑名单拦截: ${player.name} (${player.xuid}) -> 理由: ${res.reason}`);
+            logger.info(`${player.name} 本地黑名单检查不通过: ${res.reason}`);
+            csvLog("BanCheck", "System", `${player.name} failed local ban check: ${res.reason}`);
             player.kick(tr(player, "ban.kick.local", { reason: res.reason }));
             return false;
+        } else {
+            logger.info(`${player.name} 本地黑名单检查通过`);
+            csvLog("BanCheck", "System", `${player.name} passed local ban check`);
         }
     }
 });
@@ -603,16 +608,20 @@ mc.listen("onJoin", (player) => {
         let clientId = dv ? dv.clientId : null;
         let ip = getPureIp(dv ? dv.ip : player.ip);
         
+        logger.info(`开始进行 ${player.realName} 本地深度黑名单检查`);
         let res = checkLocalBan(player.xuid, player.realName, ip, clientId);
         if (res.banned) {
-            logger.warn(`[BanSystem] 本地黑名单(深度检查)拦截: ${player.realName} -> 理由: ${res.reason}`);
+            logger.info(`${player.realName} 本地深度黑名单检查不通过: ${res.reason}`);
+            csvLog("BanCheck", "System", `${player.realName} failed local deep ban check: ${res.reason}`);
             player.kick(tr(player, "ban.kick.local", { reason: res.reason }));
             return;
+        } else {
+            logger.info(`${player.realName} 本地深度黑名单检查通过`);
+            csvLog("BanCheck", "System", `${player.realName} passed local deep ban check`);
         }
         
         checkCloudBan(player.xuid, player.realName, ip, clientId, (banned, reason) => {
             if (banned) {
-                logger.warn(`[BanSystem] 云端黑名单拦截: ${player.realName} -> 理由: ${reason}`);
                 let p = mc.getPlayer(player.xuid);
                 if (p) p.kick(tr(p, "ban.kick.cloud", { reason: reason }));
                 
@@ -1029,10 +1038,10 @@ function addLocalBan(info, reason, durationDays) {
     let expire = durationDays ? Date.now() + durationDays * 86400000 : null;
     let newBan = {
         id: system.randomGuid(),
-        xuids: info.xuid ? [info.xuid] : [],
-        names: info.name ? [info.name] : [],
-        ips: info.ip ? [info.ip] : [],
-        clientIds: info.clientId ? [info.clientId] : [],
+        xuids: Array.isArray(info.xuid) ? info.xuid : (info.xuid ? [info.xuid] : []),
+        names: Array.isArray(info.name) ? info.name : (info.name ? [info.name] : []),
+        ips: Array.isArray(info.ip) ? info.ip : (info.ip ? [info.ip] : []),
+        clientIds: Array.isArray(info.clientId) ? info.clientId : (info.clientId ? [info.clientId] : []),
         reason: reason || tr(null, "ban.reason.default"),
         expireTime: expire
     };
@@ -1057,7 +1066,6 @@ function checkCloudBan(xuid, name, ip, clientId, callback) {
         checked++;
         if (isBanned && checked <= total) {
             checked = 999;
-            csvLog("CloudBan", name || xuid, `Detected by cloud: ${finalReason}`);
             callback(true, finalReason);
         } else if (checked === total && !isBanned) {
             callback(false, "");
@@ -1065,6 +1073,7 @@ function checkCloudBan(xuid, name, ip, clientId, callback) {
     }
 
     if (cfg.cloudBlackBE) {
+        logger.info(`开始进行 ${name} BlackBE云端黑名单检查`);
         let url = `https://api.blackbe.work/openapi/v3/check/?xuid=${xuid||""}&name=${name||""}`;
         network.httpGet(url, (status, result) => {
             if (status === 200 && result) {
@@ -1073,14 +1082,26 @@ function checkCloudBan(xuid, name, ip, clientId, callback) {
                     if (res.success && res.data && res.data.exist) {
                         isBanned = true;
                         finalReason = "BlackBE: " + (res.data.info[0].info || res.message);
+                        logger.info(`${name} BlackBE云端黑名单检查不通过`);
+                        csvLog("BanCheck", "System", `${name} failed BlackBE cloud ban check`);
+                    } else {
+                        logger.info(`${name} BlackBE云端黑名单检查通过`);
+                        csvLog("BanCheck", "System", `${name} passed BlackBE cloud ban check`);
                     }
-                } catch(e){}
+                } catch(e) {
+                    logger.info(`${name} BlackBE云端黑名单检查接口异常`);
+                    csvLog("BanCheck", "System", `${name} BlackBE API parse error`);
+                }
+            } else {
+                logger.info(`${name} BlackBE云端黑名单检查接口异常`);
+                csvLog("BanCheck", "System", `${name} BlackBE API error (Status: ${status})`);
             }
             finish();
         });
     }
 
     if (cfg.cloudUniteBan) {
+        logger.info(`开始进行 ${name} UniteBan云端黑名单检查`);
         let url = `https://uniteban.megastudio.cn/api/check_ban.php?xuid=${xuid||""}`;
         if (ip) url += `&ip_address=${ip}`;
         if (clientId) url += `&client_id=${clientId}`;
@@ -1091,8 +1112,19 @@ function checkCloudBan(xuid, name, ip, clientId, callback) {
                     if (res.ok && res.data && res.data.banned) {
                         isBanned = true;
                         finalReason = "UniteBan: " + res.data.ban.reason;
+                        logger.info(`${name} UniteBan云端黑名单检查不通过`);
+                        csvLog("BanCheck", "System", `${name} failed UniteBan cloud ban check`);
+                    } else {
+                        logger.info(`${name} UniteBan云端黑名单检查通过`);
+                        csvLog("BanCheck", "System", `${name} passed UniteBan cloud ban check`);
                     }
-                } catch(e){}
+                } catch(e) {
+                    logger.info(`${name} UniteBan云端黑名单检查接口异常`);
+                    csvLog("BanCheck", "System", `${name} UniteBan API parse error`);
+                }
+            } else {
+                logger.info(`${name} UniteBan云端黑名单检查接口异常`);
+                csvLog("BanCheck", "System", `${name} UniteBan API error (Status: ${status})`);
             }
             finish();
         });
@@ -1133,7 +1165,7 @@ function sendBanForm(admin) {
 }
 
 function processBan(admin, targetStr, targetPlayer, days, reason) {
-    let info = { xuid: null, name: null, ip: null, clientId: null };
+    let info = { xuid: [], name: [], ip: [], clientId: [] };
     
     if (!targetPlayer) {
         let tp = mc.getPlayer(targetStr);
@@ -1141,23 +1173,51 @@ function processBan(admin, targetStr, targetPlayer, days, reason) {
     }
 
     if (targetPlayer) {
-        info.xuid = targetPlayer.xuid;
-        info.name = targetPlayer.realName;
+        info.xuid.push(targetPlayer.xuid);
+        info.name.push(targetPlayer.realName);
         let dv = targetPlayer.getDevice();
-        info.ip = getPureIp(dv ? dv.ip : targetPlayer.ip);
-        info.clientId = dv ? dv.clientId : null;
+        let pip = getPureIp(dv ? dv.ip : targetPlayer.ip);
+        if (pip) info.ip.push(pip);
+        if (dv && dv.clientId) info.clientId.push(dv.clientId);
     } else {
-        if (/^\d{16}$/.test(targetStr)) info.xuid = targetStr;
-        else info.name = targetStr;
+        if (/^\d{16}$/.test(targetStr)) info.xuid.push(targetStr);
+        else info.name.push(targetStr);
+    }
+
+    if (config.get("playerDatabase") && config.get("playerDatabase").enabled) {
+        let allPdb = JSON.parse(pdbDb.read() || "{}");
+        let pData = null;
+        let pXuid = info.xuid.length > 0 ? info.xuid[0] : null;
+        
+        if (pXuid) {
+            pData = allPdb[pXuid];
+        } else if (info.name.length > 0) {
+            let tName = info.name[0];
+            for (let k in allPdb) {
+                if (allPdb[k].name === tName || (allPdb[k].historyname && allPdb[k].historyname.includes(tName))) {
+                    pData = allPdb[k];
+                    info.xuid.push(k);
+                    break;
+                }
+            }
+        }
+        
+        if (pData) {
+            if (pData.name && !info.name.includes(pData.name)) info.name.push(pData.name);
+            if (pData.historyname) pData.historyname.forEach(n => { if (!info.name.includes(n)) info.name.push(n); });
+            if (pData.IPs) pData.IPs.forEach(ip => { if (!info.ip.includes(ip)) info.ip.push(ip); });
+            if (pData.clientIDs) pData.clientIDs.forEach(cid => { if (!info.clientId.includes(cid)) info.clientId.push(cid); });
+        }
     }
 
     addLocalBan(info, reason, days);
     
-    let targetP = targetPlayer || (info.xuid ? mc.getPlayer(info.xuid) : null) || (info.name ? mc.getPlayer(info.name) : null);
+    let targetP = targetPlayer || (info.xuid.length > 0 ? mc.getPlayer(info.xuid[0]) : null) || (info.name.length > 0 ? mc.getPlayer(info.name[0]) : null);
     if (targetP) targetP.kick(tr(targetP, "ban.kick.local", { reason: reason }));
 
     sendMsg(admin.tell ? admin : null, "ban.success");
-    csvLog("Ban", admin.realName || "Console", `Banned ${info.name||info.xuid} for ${days ? days+" days" : "forever"}`);
+    let tNameOrXuid = info.name.length > 0 ? info.name[0] : (info.xuid.length > 0 ? info.xuid[0] : "Unknown");
+    csvLog("Ban", admin.realName || "Console", `Banned ${tNameOrXuid} for ${days ? days+" days" : "forever"}`);
 }
 
 function sendUnbanForm(admin) {
@@ -2429,13 +2489,32 @@ function sendPMStatusMenu(admin, targetPlayer) {
             if (clickedItem && !clickedItem.isNull()) {
                 let nbt = clickedItem.getNbt();
                 let nbtStr = nbt ? nbt.toString(4) : "该物品无 NBT 数据附着";
+                let isSuper = config.get("customCommands").superAdmins.includes(pl.xuid);
+                
                 let nbtFm = mc.newSimpleForm()
                     .setTitle(`物品 NBT 审查 [插槽 ${slotIdx}]`)
                     .setContent(`物品: ${clickedItem.name}\n数量: ${clickedItem.count}\n类型ID: ${clickedItem.type}\n\n==== NBT 结构 ====\n${nbtStr}`)
                     .addButton("返回上级菜单");
+                    
+                if (isSuper) {
+                    nbtFm.addButton("复制该物品到我的背包");
+                }
                 
                 pl.sendForm(nbtFm, (pl2, id2) => {
-                    sendPMStatusMenu(pl2, stillOnline);
+                    if (id2 === 0 || id2 == null) {
+                        sendPMStatusMenu(pl2, stillOnline);
+                    } else if (isSuper && id2 === 1) {
+                        let cloneItem = clickedItem.clone();
+                        let adminInv = pl2.getInventory();
+                        if (adminInv && adminInv.hasRoomFor(cloneItem)) {
+                            adminInv.addItemToFirstEmptySlot(cloneItem);
+                            pl2.refreshItems();
+                            pl2.tell(PREFIX + "§a物品已成功复制到你的背包！");
+                        } else {
+                            pl2.tell(PREFIX + "§c复制失败：你的背包已满或无法获取背包对象。");
+                        }
+                        sendPMStatusMenu(pl2, stillOnline);
+                    }
                 });
             } else {
                 pl.tell("§c该槽位物品已被移动或变为空！");
@@ -2512,9 +2591,10 @@ ll.export((xuid) => {
 
 ll.export((xuid, name, ip, clientId) => {
     if (!config.get("ban") || !config.get("ban").enabled) return null;
-    let pureIp = getPureIp(ip); 
+    let pureIp = getPureIp(ip);
     return checkLocalBan(xuid, name, pureIp, clientId).banned;
 }, "UEssential", "isBanned");
 
+
 logger.setTitle("UEssential");
-logger.info("UEssential " + VERSION.join(".") + " 加载成功！作者：wuw111，使用Gemini系列模型辅助开发。BUG反馈请加入反馈群：1097933637。本插件为免费插件，如果您是花钱购买的，请立刻投诉商家并且要求退款。");
+logger.info("UEssential " + VERSION.join(".") + " 加载成功！作者：wuw111。BUG反馈或功能建议欢迎加入反馈群：1097933637。本插件为免费插件，如果您是花钱购买的，请立刻投诉商家并且要求退款。");
