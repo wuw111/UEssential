@@ -1,3 +1,5 @@
+# 项目地址 https://github.com/wuw111/UEssential
+
 # UEssential v1.1.2 更新日志 (Changelog)
 
 **发布日期：** 2026/04/14
