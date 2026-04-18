@@ -1,17 +1,18 @@
 /*-----------------------------------------------------------------------
-UEssential 基础生存插件 - v1.1.2
+UEssential 基础插件
 Copyright (c) 2024-2026 wuw111. All rights reserved.
-[授权声明 - CASAL v1.0]
+[授权声明]
 本项目基于 CASAL v1.0 协议授权。官方发布渠道仅限 GitHub、KLPBBS、MineBBS，禁止未经许可的转载。
 运行环境：本插件仅限服务端运行，严禁将本体代码或逻辑分发至客户端（如JS源码内容等）。
 允许二次开发，但在公网服务器运行修改版时，必须公开完整源码并沿用 CASAL 协议。
 商业：允许商业服务器部署使用。但【严禁】直接售卖插件、将其加入付费整合包，或在商业服务器内将插件内功能设为“付费解锁”。
 详细条款、例外情况及授权定义请参阅项目根目录下的 LICENSE 文件。
 温馨提示：本插件永久免费。若您为下载插件文件或为了解锁其内部功能而付费，说明您已被骗，请立即举报。
+项目地址：https://github.com/wuw111/UEssential
 -----------------------------------------------------------------------*/
 
 const PLUGIN_NAME = "UEssential";
-const VERSION = [1, 1, 2];
+const VERSION = [1, 2, 0];
 const PREFIX = "§b§l[UEssential]§r ";
 const DIR_PATH = "plugins/" + PLUGIN_NAME;
 const LANG_PATH = DIR_PATH + "/lang";
@@ -54,7 +55,7 @@ const DEFAULT_CONFIG = {
     motd: { enabled: false, intervalSeconds: 5, list: ["§b欢迎来到服务器", "§a当前在线: {online}", "§e当前TPS: {tps}"] },
     customCommands: { enabled: true, superAdmins: ["9999999999999999"] },
     playerManage: { enabled: true },
-    playerDatabase: { enabled: true }
+    playerDatabase: { enabled: true, autoBackup: true, backupIntervalDays: 1, queryMinLength: 3 }
 };
 
 const configPath = DIR_PATH + "/config.json";
@@ -105,7 +106,7 @@ const defaultLangData = {
         "error.player_only": "仅限玩家执行此命令。",
         "error.deduct": "扣款失败！",
         
-        "wordfilter.blocked": "操作失败：名称包含违禁词汇！",
+        "wordfilter.blocked": "操作失败：内容包含违禁词汇！",
 
         "tps.admin.title": "§l§6=== 服务器 TPS 状态 ===§r\n",
         "tps.admin.current": "当前TPS: §a{tps}§r\n",
@@ -191,7 +192,7 @@ const defaultLangData = {
         "eco.transfer.no_players": "当前没有其他可转账的在线玩家！",
         "eco.transfer.title": "转账中心",
         "eco.transfer.desc": "请选择收款人并输入金额。\n系统将收取 §c{tax}%§r 的转账税。",
-        "eco.transfer.target": "收款玩家",
+        "eco.transfer.target": "选择在线收款人",
         "eco.transfer.amount": "转账金额 (整数)",
         "eco.transfer.invalid": "金额输入有误，请输入有效的正整数！",
         "eco.transfer.insufficient": "转账失败：您的余额不足。本次需包含税费共 {cost} 金币",
@@ -311,8 +312,32 @@ const cusCmdDb = new JsonConfigFile(DIR_PATH + "/cuscmds.json", JSON.stringify({
     }
 }));
 
-const pdbDb = new JsonConfigFile(DIR_PATH + "/playerdatabase.json", "{}");
+let pdbKV = new KVDatabase(DIR_PATH + "/player_data_kv");
+if (!pdbKV) {
+    logger.fatal("KVDatabase 初始化失败！请重启服务端释放死锁文件。");
+}
+ll.onUnload(() => { if (pdbKV) { pdbKV.close(); pdbKV = null; } });
+
+const oldPdbPath = DIR_PATH + "/playerdatabase.json";
+if (File.exists(oldPdbPath)) {
+    try {
+        let oldDataStr = File.readFrom(oldPdbPath);
+        if (oldDataStr) {
+            let oldData = JSON.parse(oldDataStr);
+            for (let xuid in oldData) {
+                pdbKV.set(xuid, JSON.stringify(oldData[xuid]));
+            }
+            File.writeTo(DIR_PATH + "/playerdatabase_backup_" + system.getTimeObj().Y + system.getTimeObj().M + system.getTimeObj().D + ".json", oldDataStr);
+            File.delete(oldPdbPath);
+            logger.info("已成功将旧版 playerdatabase.json 迁移至新一代 KVDatabase。");
+        }
+    } catch(e) {
+        logger.error("旧版玩家数据库迁移失败: " + e);
+    }
+}
+
 const regDb = new JsonConfigFile(DIR_PATH + "/regplayer.json", JSON.stringify({ total: 0, records: {} }));
+const offlineDb = new JsonConfigFile(DIR_PATH + "/offline_transfers.json", "{}");
 
 let csvLogQueue = [];
 
@@ -417,7 +442,7 @@ function getPureIp(ipStr) {
 const Util = {
     getTodayStr: function() {
         let tm = system.getTimeObj();
-        return `${tm.Y}-${tm.M}-${tm.D}`;
+        return `${tm.Y}-${String(tm.M).padStart(2,'0')}-${String(tm.D).padStart(2,'0')}`;
     },
     getCount: function(dbKey, xuid) {
         let today = this.getTodayStr();
@@ -455,6 +480,11 @@ const Eco = {
     },
     get: function(player) {
         return this.getSpecific(player, this.cfg.type === "llmoney" ? "llmoney" : this.cfg.sbName);
+    },
+    set: function(player, amount) {
+        amount = Math.floor(amount);
+        if (this.cfg.type === "llmoney") return money.set(player.xuid, amount);
+        else return player.setScore(this.cfg.sbName, amount) !== null;
     },
     reduce: function(player, amount) {
         amount = Math.floor(amount);
@@ -549,7 +579,8 @@ mc.listen("onTick", () => {
             if (modified) pubHomeDb.write(JSON.stringify(pubObj, null, 4));
         }
 
-        if (config.get("playerDatabase") && config.get("playerDatabase").enabled) {
+        let pDbCfg = config.get("playerDatabase");
+        if (pDbCfg && pDbCfg.enabled) {
             let now = Date.now();
             let inc = 1.05; 
             let tpsCfg = config.get("tps");
@@ -563,10 +594,28 @@ mc.listen("onTick", () => {
             let players = mc.getOnlinePlayers();
             for (let pl of players) {
                 if (pl.isSimulatedPlayer()) continue;
-                let data = pdbDb.get(pl.xuid);
+                let raw = pdbKV.get(pl.xuid);
+                let data = raw ? JSON.parse(raw) : null;
                 if (data) {
                     data.OnlineTime = Math.round(((data.OnlineTime || 0) + inc) * 100) / 100;
-                    pdbDb.set(pl.xuid, data);
+                    pdbKV.set(pl.xuid, JSON.stringify(data));
+                }
+            }
+
+            if (pDbCfg.autoBackup) {
+                let lastBackup = dataDb.init("lastPdbBackup", 0);
+                if (now - lastBackup >= (pDbCfg.backupIntervalDays || 1) * 86400000) {
+                    let keys = pdbKV.listKey();
+                    let exportObj = {};
+                    for(let k of keys) {
+                        let raw = pdbKV.get(k);
+                        if (raw) exportObj[k] = JSON.parse(raw);
+                    }
+                    let dir = DIR_PATH + "/export";
+                    if (!File.exists(dir)) File.mkdir(dir);
+                    File.writeTo(dir + `/playerdatabase_autobackup_${Util.getTodayStr()}.json`, JSON.stringify(exportObj, null, 4));
+                    dataDb.set("lastPdbBackup", now);
+                    logger.info("玩家数据库已按计划完成自动备份。");
                 }
             }
         }
@@ -634,7 +683,8 @@ mc.listen("onJoin", (player) => {
 
     if (config.get("playerDatabase") && config.get("playerDatabase").enabled) {
         let xuid = player.xuid;
-        let pData = pdbDb.get(xuid);
+        let rawPData = pdbKV.get(xuid);
+        let pData = rawPData ? JSON.parse(rawPData) : null;
         let dv = player.getDevice();
         let ip = getPureIp(dv ? dv.ip : player.ip);
         let cid = dv ? dv.clientId : null;
@@ -648,13 +698,15 @@ mc.listen("onJoin", (player) => {
                 historyname: [],
                 IPs: [],
                 clientIDs: [],
-                OnlineTime: 0
+                OnlineTime: 0,
+                lastOnlineTime: Date.now()
             };
         } else {
             if (!pData.historyname) pData.historyname = [];
             if (!pData.IPs) pData.IPs = [];
             if (!pData.clientIDs) pData.clientIDs = [];
             if (pData.OnlineTime == null) pData.OnlineTime = 0;
+            pData.lastOnlineTime = Date.now();
             
             if (pData.name !== realName) {
                 if (!pData.historyname.includes(pData.name)) pData.historyname.push(pData.name);
@@ -665,7 +717,7 @@ mc.listen("onJoin", (player) => {
         if (ip && !pData.IPs.includes(ip)) pData.IPs.push(ip);
         if (cid && !pData.clientIDs.includes(cid)) pData.clientIDs.push(cid);
         
-        pdbDb.set(xuid, pData);
+        pdbKV.set(xuid, JSON.stringify(pData));
 
         if (isNew) {
             let regData = JSON.parse(regDb.read() || '{"total":0,"records":{}}');
@@ -684,6 +736,29 @@ mc.listen("onJoin", (player) => {
         }
     }
 
+    let offTransfers = JSON.parse(offlineDb.read() || "{}");
+    if (offTransfers[player.xuid]) {
+        let records = offTransfers[player.xuid];
+        setTimeout(() => {
+            let p = mc.getPlayer(player.xuid);
+            if (p) {
+                for (let r of records) {
+                    if (r.amount > 0) {
+                        Eco.add(p, r.amount);
+                        p.tell(PREFIX + `§a您收到了一笔离线转账/拨款！\n§e金额: §a${r.amount}\n§e发件人: §b${r.senderName}\n§e时间: §7${r.time}\n§e留言: §f${r.note || "无"}`);
+                    } else if (r.amount < 0) {
+                        let absAmt = Math.abs(r.amount);
+                        let current = Eco.get(p);
+                        Eco.set(p, current + r.amount);
+                        p.tell(PREFIX + `§c系统在您离线期间扣除了款项！\n§e金额: §c${absAmt}\n§e操作人: §b${r.senderName}\n§e时间: §7${r.time}\n§e留言: §f${r.note || "无"}`);
+                    }
+                }
+                delete offTransfers[player.xuid];
+                offlineDb.write(JSON.stringify(offTransfers, null, 4));
+            }
+        }, 3000);
+    }
+
     if (config.get("notice").enabled) {
         setTimeout(() => {
             let p = mc.getPlayer(player.xuid);
@@ -696,6 +771,16 @@ mc.listen("onJoin", (player) => {
                 }
             }
         }, 5000); 
+    }
+});
+
+mc.listen("onLeft", (player) => {
+    if (player.isSimulatedPlayer() || !config.get("playerDatabase").enabled) return;
+    let raw = pdbKV.get(player.xuid);
+    if (raw) {
+        let data = JSON.parse(raw);
+        data.lastOnlineTime = Date.now();
+        pdbKV.set(player.xuid, JSON.stringify(data));
     }
 });
 
@@ -856,6 +941,7 @@ function startTprSearch(player, cost, dimCfg, attempts, originalPos, cfg) {
         }
     }, cfg.loadDelayMs);
 }
+
 
 function getAvgTps(expectedSeconds) {
     if (tickTotalCount < 2) return (20.00).toFixed(2);
@@ -1185,19 +1271,24 @@ function processBan(admin, targetStr, targetPlayer, days, reason) {
     }
 
     if (config.get("playerDatabase") && config.get("playerDatabase").enabled) {
-        let allPdb = JSON.parse(pdbDb.read() || "{}");
         let pData = null;
         let pXuid = info.xuid.length > 0 ? info.xuid[0] : null;
         
         if (pXuid) {
-            pData = allPdb[pXuid];
+            let raw = pdbKV.get(pXuid);
+            if (raw) pData = JSON.parse(raw);
         } else if (info.name.length > 0) {
             let tName = info.name[0];
-            for (let k in allPdb) {
-                if (allPdb[k].name === tName || (allPdb[k].historyname && allPdb[k].historyname.includes(tName))) {
-                    pData = allPdb[k];
-                    info.xuid.push(k);
-                    break;
+            let keys = pdbKV.listKey();
+            for (let k of keys) {
+                let raw = pdbKV.get(k);
+                if (raw) {
+                    let d = JSON.parse(raw);
+                    if (d.name === tName || (d.historyname && d.historyname.includes(tName))) {
+                        pData = d;
+                        info.xuid.push(k);
+                        break;
+                    }
                 }
             }
         }
@@ -1440,7 +1531,7 @@ function sendHomeMainForm(pl) {
 function sendHomeAddForm(pl) {
     let fm = mc.newCustomForm().setTitle(tr(pl, "home.add.title"));
     fm.addInput(tr(pl, "home.add.name"), "Name");
-    pl.sendForm(fm, (player, data) => { if (data != null) processHomeAdd(player, data[0]); });
+    pl.sendForm(fm, (player, data) => { if (data != null && (data[0] || "").trim() !== "") processHomeAdd(player, data[0]); });
 }
 
 function sendHomeDeleteForm(pl) {
@@ -1745,7 +1836,7 @@ function addWarpForm(player, isCurrent) {
 
     player.sendForm(fm, (pl, data) => {
         if (data == null) return; 
-        let name = data[0];
+        let name = (data[0] || "").trim();
         if (name === "") return;
         let warps = getWarpsObj();
         if (warps[name]) { sendMsg(pl, "warp.add.exist"); return; }
@@ -1753,11 +1844,11 @@ function addWarpForm(player, isCurrent) {
         let newWarp = {};
         if (isCurrent) {
             let pos = pl.pos;
-            newWarp = { x: pos.x, y: pos.y, z: pos.z, dimid: pos.dimid, icon: data[1] };
+            newWarp = { x: pos.x, y: pos.y, z: pos.z, dimid: pos.dimid, icon: (data[1] || "").trim() };
         } else {
             let x = parseFloat(data[1]), y = parseFloat(data[2]), z = parseFloat(data[3]);
             if (isNaN(x) || isNaN(y) || isNaN(z)) { sendMsg(pl, "warp.invalid"); return; }
-            newWarp = { x: x, y: y, z: z, dimid: data[4], icon: data[5] };
+            newWarp = { x: x, y: y, z: z, dimid: data[4], icon: (data[5] || "").trim() };
         }
         warpDb.set(name, newWarp);
         sendMsg(pl, "warp.add.success", { name: name });
@@ -1798,10 +1889,10 @@ function editWarpSelectForm(player) {
 
         pl.sendForm(cfm, (pl2, data) => {
             if (data == null) return; 
-            let newName = data[0], x = parseFloat(data[1]), y = parseFloat(data[2]), z = parseFloat(data[3]);
+            let newName = (data[0] || "").trim(), x = parseFloat(data[1]), y = parseFloat(data[2]), z = parseFloat(data[3]);
             if (newName === "" || isNaN(x) || isNaN(y) || isNaN(z)) { sendMsg(pl2, "warp.invalid"); return; }
             if (newName !== tName) warpDb.delete(tName);
-            warpDb.set(newName, { x: x, y: y, z: z, dimid: data[4], icon: data[5] });
+            warpDb.set(newName, { x: x, y: y, z: z, dimid: data[4], icon: (data[5] || "").trim() });
             sendMsg(pl2, "warp.edit.success", { name: newName });
             csvLog("Warp", pl2.realName, "Edited warp " + newName);
         });
@@ -2045,33 +2136,127 @@ function sendMoneyMainForm(player) {
 
 function sendTransferForm(player) {
     let onlinePlayers = mc.getOnlinePlayers().filter(p => p.xuid !== player.xuid);
-    if (onlinePlayers.length === 0) { sendMsg(player, "eco.transfer.no_players"); return; }
+    let pList = onlinePlayers.map(p => ({ xuid: p.xuid, name: p.realName }));
+    pList.unshift({xuid: null, name: "--- 使用下方输入框搜索离线玩家 ---"});
 
-    let pList = onlinePlayers.map(p => ({ xuid: p.xuid, name: p.realName })), taxRate = config.get("economy").transferTaxRate;
-    let fm = mc.newCustomForm().setTitle(tr(player, "eco.transfer.title")).addLabel(tr(player, "eco.transfer.desc", { tax: (taxRate * 100).toFixed(1) }))
-        .addDropdown(tr(player, "eco.transfer.target"), pList.map(i => i.name), 0).addInput(tr(player, "eco.transfer.amount"), "输入金额", "100");
+    let taxRate = config.get("economy").transferTaxRate;
+    let fm = mc.newCustomForm()
+        .setTitle(tr(player, "eco.transfer.title"))
+        .addLabel(tr(player, "eco.transfer.desc", { tax: (taxRate * 100).toFixed(1) }))
+        .addDropdown(tr(player, "eco.transfer.target"), pList.map(i => i.name), 0)
+        .addInput("或输入要搜索的离线玩家名称 (留空则使用上方下拉列表)", "最少3个字符", "")
+        .addInput(tr(player, "eco.transfer.amount"), "输入金额", "100")
+        .addInput("转账备注留言 (可选)", "最多50字", "");
 
     player.sendForm(fm, (pl, data) => {
         if (data == null) return;
-        let targetPlayer = mc.getPlayer(pList[data[1]].xuid);
-        if (!targetPlayer) { sendMsg(pl, "tpa.target_offline"); return; }
+        let dropdownSelection = data[1];
+        let searchName = (data[2] || "").trim();
+        let amount = parseInt(data[3]);
+        let note = (data[4] || "").trim();
 
-        let amount = parseInt(data[2]);
         if (isNaN(amount) || amount <= 0) { sendMsg(pl, "eco.transfer.invalid"); return; }
+        if (note.length > 50) { pl.tell(PREFIX + "§c转账备注过长！最多50个字符。"); return; }
+        if (!checkWordFilter(note)) { sendMsg(pl, "wordfilter.blocked"); return; }
 
         let tax = Math.floor(amount * taxRate), totalCost = amount + tax;
         if (Eco.get(pl) < totalCost) { sendMsg(pl, "eco.transfer.insufficient", { cost: totalCost, amount: amount, tax: tax }); return; }
 
-        if (Eco.reduce(pl, totalCost)) {
-            if (Eco.add(targetPlayer, amount)) {
-                sendMsg(pl, "eco.transfer.success.sender", { name: targetPlayer.realName, amount: amount, tax: tax });
-                sendMsg(targetPlayer, "eco.transfer.success.target", { name: pl.realName, amount: amount });
-                csvLog("Transfer", pl.realName, `Sent ${amount} to ${targetPlayer.realName} with tax ${tax}`);
-            } else {
-                Eco.add(pl, totalCost);
-                sendMsg(pl, "eco.transfer.rollback");
+        if (searchName !== "") {
+            let minLen = config.get("playerDatabase").queryMinLength || 3;
+            if (searchName.length < minLen) { pl.tell(PREFIX + `§c搜索名称太短，请至少输入 ${minLen} 个字符以防止误操作。`); return; }
+            
+            let keys = pdbKV.listKey();
+            let matches = [];
+            let lowerQ = searchName.toLowerCase();
+            for(let k of keys) {
+                let raw = pdbKV.get(k);
+                if(raw) {
+                    let d = JSON.parse(raw);
+                    if (d.name.toLowerCase().includes(lowerQ) || (d.historyname && d.historyname.some(n => n.toLowerCase().includes(lowerQ)))) {
+                        if (k !== pl.xuid) matches.push({xuid: k, data: d});
+                    }
+                }
             }
-        } else sendMsg(pl, "eco.transfer.fail");
+            
+            if (matches.length === 0) { pl.tell(PREFIX + "§c未找到任何匹配该名称的玩家记录！"); return; }
+            if (matches.length === 1) {
+                sendTransferConfirmForm(pl, matches[0].xuid, matches[0].data.name, amount, totalCost, tax, note);
+            } else {
+                sendTransferSelectMatchForm(pl, matches, amount, totalCost, tax, note);
+            }
+        } else {
+            if (dropdownSelection === 0) { pl.tell(PREFIX + "§c操作失败：请从下拉列表中选择有效的在线玩家，或者在下方输入框填写离线玩家名称！"); return; }
+            let targetInfo = pList[dropdownSelection];
+            sendTransferConfirmForm(pl, targetInfo.xuid, targetInfo.name, amount, totalCost, tax, note);
+        }
+    });
+}
+
+function sendTransferSelectMatchForm(player, matches, amount, totalCost, tax, note) {
+    let fm = mc.newSimpleForm().setTitle("选择转账目标").setContent("找到多个匹配项，请点击以选择确切的收款玩家：");
+    matches.forEach(m => {
+        let lastOn = m.data.lastOnlineTime ? new Date(m.data.lastOnlineTime).toLocaleString() : "未知";
+        fm.addButton(`${m.data.name}\n最后上线: ${lastOn}`);
+    });
+    player.sendForm(fm, (pl, id) => {
+        if (id == null) return;
+        sendTransferConfirmForm(pl, matches[id].xuid, matches[id].data.name, amount, totalCost, tax, note);
+    });
+}
+
+function sendTransferConfirmForm(player, targetXuid, targetName, amount, totalCost, tax, note) {
+    let fm = mc.newSimpleForm()
+        .setTitle("转账最终确认")
+        .setContent(`§e收款人: §a${targetName}\n§e转账金额: §a${amount}\n§e手续费: §c${tax}\n§e总扣除: §c${totalCost}\n§e备注留言: §f${note || "无"}\n\n您确认要立即执行此转账吗？`)
+        .addButton("确认转账")
+        .addButton("取消");
+        
+    player.sendForm(fm, (pl, id) => {
+        if (id !== 0) return;
+        if (Eco.get(pl) < totalCost) { sendMsg(pl, "eco.transfer.insufficient", { cost: totalCost, amount: amount, tax: tax }); return; }
+        
+        if (Eco.reduce(pl, totalCost)) {
+            let targetPlayer = mc.getPlayer(targetXuid);
+            if (targetPlayer) {
+                if (Eco.add(targetPlayer, amount)) {
+                    sendMsg(pl, "eco.transfer.success.sender", { name: targetPlayer.realName, amount: amount, tax: tax });
+                    targetPlayer.tell(PREFIX + `§a您收到了一笔转账！\n§e金额: §a${amount}\n§e发件人: §b${pl.realName}\n§e留言: §f${note || "无"}`);
+                    csvLog("Transfer", pl.realName, `Sent ${amount} to ${targetPlayer.realName} with tax ${tax} (Note: ${note})`);
+                } else {
+                    Eco.add(pl, totalCost);
+                    sendMsg(pl, "eco.transfer.rollback");
+                }
+            } else {
+                let ecoType = config.get("economy").type;
+                if (ecoType === "llmoney") {
+                    if (money.add(targetXuid, amount)) {
+                        sendMsg(pl, "eco.transfer.success.sender", { name: targetName, amount: amount, tax: tax });
+                        csvLog("TransferOfflineLL", pl.realName, `Sent ${amount} to offline ${targetName} with tax ${tax} (Note: ${note})`);
+                    } else {
+                        Eco.add(pl, totalCost);
+                        sendMsg(pl, "eco.transfer.rollback");
+                    }
+                } else {
+                    let offDb = JSON.parse(offlineDb.read() || "{}");
+                    if (!offDb[targetXuid]) offDb[targetXuid] = [];
+                    let tm = system.getTimeStr();
+                    offDb[targetXuid].push({
+                        senderName: pl.realName,
+                        senderXuid: pl.xuid,
+                        amount: amount,
+                        time: tm,
+                        note: note
+                    });
+                    offlineDb.write(JSON.stringify(offDb, null, 4));
+                    sendMsg(pl, "eco.transfer.success.sender", { name: targetName, amount: amount, tax: tax });
+                    pl.tell(PREFIX + `§e目标玩家当前离线，由于使用记分板经济，款项已在系统暂存，将在对方下次上线时自动到账。`);
+                    csvLog("TransferOffline", pl.realName, `Sent ${amount} to offline ${targetName} with tax ${tax} (Note: ${note})`);
+                }
+            }
+        } else {
+            sendMsg(pl, "eco.transfer.fail");
+        }
     });
 }
 
@@ -2187,10 +2372,10 @@ function sendCusCmdCreateForm(player) {
 
     player.sendForm(fm, (pl, data) => {
         if (data == null) return;
-        let cmdName = data[0].trim();
-        let desc = data[1].trim(); 
-        let alias = data[2].trim();
-        let targetCmd = data[3].trim();
+        let cmdName = (data[0] || "").trim();
+        let desc = (data[1] || "").trim(); 
+        let alias = (data[2] || "").trim();
+        let targetCmd = (data[3] || "").trim();
         let runAsConsole = (data[4] === 1);
         let hasArgs = data[5];
 
@@ -2324,9 +2509,9 @@ function registerPlayerManageCommands() {
             case "money":
                 let amt = parseInt(content);
                 if(!isNaN(amt)) {
-                    if(amt > 0) Eco.add(targetPlayer, amt);
-                    else if(amt < 0) Eco.reduce(targetPlayer, -amt);
-                    admin.tell("§a已调整玩家资金: " + amt);
+                    let current = Eco.get(targetPlayer);
+                    Eco.set(targetPlayer, current + amt);
+                    admin.tell("§a已强制调整玩家资金: " + amt);
                 }
                 break;
             case "status":
@@ -2379,13 +2564,13 @@ function sendPMTargetMenu(admin, targetPlayer) {
             case 1:
                 let fm1 = mc.newCustomForm().setTitle("替身发言").addInput("输入发言内容", "");
                 pl.sendForm(fm1, (pl2, data) => {
-                    if(data && data[0] !== "") targetPlayer.talkAs(data[0]);
+                    if(data && (data[0] || "") !== "") targetPlayer.talkAs(data[0]);
                 });
                 break;
             case 2:
                 let fm2 = mc.newCustomForm().setTitle("替身执行命令").addInput("输入需代为执行的命令 (不带/)", "");
                 pl.sendForm(fm2, (pl2, data) => {
-                    if(data && data[0] !== "") targetPlayer.runcmd(data[0].startsWith("/") ? data[0].substring(1) : data[0]);
+                    if(data && (data[0] || "") !== "") targetPlayer.runcmd(data[0].startsWith("/") ? data[0].substring(1) : data[0]);
                 });
                 break;
             case 3:
@@ -2394,9 +2579,9 @@ function sendPMTargetMenu(admin, targetPlayer) {
                     if(data) {
                         let amt = parseInt(data[0]);
                         if(!isNaN(amt) && amt !== 0) {
-                            if(amt > 0) Eco.add(targetPlayer, amt);
-                            else Eco.reduce(targetPlayer, -amt);
-                            pl2.tell("§a资金操作已生效。");
+                            let current = Eco.get(targetPlayer);
+                            Eco.set(targetPlayer, current + amt);
+                            pl2.tell("§a强制资金操作已生效。");
                         }
                     }
                 });
@@ -2443,8 +2628,11 @@ function sendPMStatusMenu(admin, targetPlayer) {
     
     let onlineTime = "Null";
     if(config.get("playerDatabase") && config.get("playerDatabase").enabled) {
-        let pData = pdbDb.get(targetPlayer.xuid);
-        if(pData) onlineTime = (pData.OnlineTime || 0).toFixed(2) + " 分钟";
+        let raw = pdbKV.get(targetPlayer.xuid);
+        if(raw) {
+            let pData = JSON.parse(raw);
+            onlineTime = (pData.OnlineTime || 0).toFixed(2) + " 分钟";
+        }
     }
 
     let info = `名称: ${targetPlayer.realName}\n`;
@@ -2453,7 +2641,7 @@ function sendPMStatusMenu(admin, targetPlayer) {
     info += `IP: ${ip}\n`;
     info += `ClientID: ${cid}\n`;
     info += `OS: ${os}\n`;
-    info += `在线时长: ${onlineTime}\n\n`;
+    info += `累积在线时长: ${onlineTime}\n\n`;
     info += `--- 背包物品 (点击审查NBT) ---`;
 
     let fm = mc.newSimpleForm().setTitle("玩家信息: " + targetPlayer.realName).setContent(info);
@@ -2526,20 +2714,68 @@ function sendPMStatusMenu(admin, targetPlayer) {
 
 function registerPlayerDatabaseCommand() {
     let cmd = mc.newCommand("playerdatabase", "Player Database System", PermType.GameMasters);
-    cmd.setEnum("PDBAction", ["refresh"]);
+    cmd.setEnum("PDBAction", ["refresh", "export", "query"]);
     cmd.optional("action", ParamType.Enum, "PDBAction", "PDBAction", 1);
+    cmd.optional("param", ParamType.String);
     cmd.overload([]);
     cmd.overload(["action"]);
+    cmd.overload(["action", "param"]);
+    
     cmd.setCallback((cmd, origin, out, results) => {
         if(!origin.player) return;
-        if(results.action === "refresh") {
+        let action = results.action;
+        let pl = origin.player;
+
+        if(!action || action === "refresh") {
             let regData = JSON.parse(regDb.read() || '{"total":0,"records":{}}');
             let count = Object.keys(regData.records || {}).length;
             regData.total = count;
             regDb.write(JSON.stringify(regData, null, 4));
-            origin.player.tell("§a已重新计算并更新数据库中实际的总注册玩家数: " + count);
-        } else {
-            sendPDBMenu(origin.player);
+            
+            let kvKeys = pdbKV.listKey();
+            pl.tell(PREFIX + "§a数据库已计算刷新完毕。当前KVDB内记录总数: " + kvKeys.length + " | 注册记录数: " + count);
+            sendPDBMenu(pl);
+        } else if (action === "export") {
+            let keys = pdbKV.listKey();
+            let exportObj = {};
+            for(let k of keys) {
+                let raw = pdbKV.get(k);
+                if (raw) exportObj[k] = JSON.parse(raw);
+            }
+            let dir = DIR_PATH + "/export";
+            if (!File.exists(dir)) File.mkdir(dir);
+            let dateStr = Util.getTodayStr();
+            let fp = dir + `/playerdatabase_manual_${dateStr}.json`;
+            File.writeTo(fp, JSON.stringify(exportObj, null, 4));
+            pl.tell(PREFIX + "§a操作成功！数据库全量数据已手动导出至文件: " + fp);
+        } else if (action === "query") {
+            let queryStr = results.param;
+            if (!queryStr) {
+                pl.tell(PREFIX + "§c指令使用错误：请输入要搜索的玩家名称片段！用法: /playerdatabase query [名字]");
+                return;
+            }
+            let minLen = config.get("playerDatabase").queryMinLength || 3;
+            if (queryStr.length < minLen) {
+                pl.tell(PREFIX + `§c搜索字段太短！为防止误操作和服务器卡顿，请至少输入 ${minLen} 个字符。`);
+                return;
+            }
+            let keys = pdbKV.listKey();
+            let matches = [];
+            let lowerQ = queryStr.toLowerCase();
+            for(let k of keys) {
+                let raw = pdbKV.get(k);
+                if(raw) {
+                    let d = JSON.parse(raw);
+                    if (d.name.toLowerCase().includes(lowerQ) || (d.historyname && d.historyname.some(n => n.toLowerCase().includes(lowerQ)))) {
+                        matches.push({xuid: k, data: d});
+                    }
+                }
+            }
+            if (matches.length === 0) {
+                pl.tell(PREFIX + "§c检索完毕：未在数据库中找到任何匹配该名称的玩家记录。");
+            } else {
+                sendPdbQueryMatches(pl, matches, queryStr);
+            }
         }
     });
     cmd.setup();
@@ -2559,7 +2795,8 @@ function sendPDBMenu(admin) {
         let rec = regData.records[xuid];
         if(now - rec.ts <= sevendays) {
             count7++;
-            let pData = pdbDb.get(xuid);
+            let raw = pdbKV.get(xuid);
+            let pData = raw ? JSON.parse(raw) : null;
             let timePlay = pData ? (pData.OnlineTime || 0).toFixed(2) : "0.00";
             fm.addButton(`[${rec.name}]\n注册: ${rec.date} ${rec.time} | 游玩: ${timePlay}分钟`);
         }
@@ -2570,6 +2807,86 @@ function sendPDBMenu(admin) {
     }
     
     admin.sendForm(fm, (pl, id) => {});
+}
+
+function sendPdbQueryMatches(admin, matches, queryStr) {
+    let fm = mc.newSimpleForm().setTitle("检索结果: " + queryStr).setContent(`检索完毕，共找到 ${matches.length} 名符合条件的玩家，点击可查看详情并执行管理操作：`);
+    matches.forEach(m => {
+        let lastOn = m.data.lastOnlineTime ? new Date(m.data.lastOnlineTime).toLocaleString() : "未知";
+        fm.addButton(`${m.data.name}\nXUID: ${m.xuid} | 上线: ${lastOn}`);
+    });
+    admin.sendForm(fm, (pl, id) => {
+        if (id == null) return;
+        let targetXuid = matches[id].xuid;
+        let targetPlayer = mc.getPlayer(targetXuid);
+        if (targetPlayer) {
+            sendPMTargetMenu(pl, targetPlayer);
+        } else {
+            sendPMStatusMenuForOffline(pl, targetXuid, matches[id].data);
+        }
+    });
+}
+
+function sendPMStatusMenuForOffline(admin, targetXuid, pData) {
+    let fm = mc.newSimpleForm().setTitle("离线玩家管理: " + pData.name);
+    let ips = (pData.IPs || []).join(", ");
+    let cids = (pData.clientIDs || []).join(", ");
+    let lastOn = pData.lastOnlineTime ? new Date(pData.lastOnlineTime).toLocaleString() : "从未记录";
+    let onlineTime = (pData.OnlineTime || 0).toFixed(2) + " 分钟";
+    
+    let content = `当前名: ${pData.name}\n曾用名: ${(pData.historyname || []).join(", ")}\nXUID: ${targetXuid}\n`;
+    content += `IP地址历史: ${ips}\n设备ClientID历史: ${cids}\n服务器累积游玩时长: ${onlineTime}\n最后上线记录: ${lastOn}\n\n§c[注意]§r 目标目前处于离线状态，背包等游戏内动态数据无法获取。`;
+    
+    fm.setContent(content);
+    fm.addButton("加入黑名单 (Offline Ban)");
+    fm.addButton("资金管理 (Offline Money)");
+    fm.addButton("返回");
+    
+    admin.sendForm(fm, (pl, id) => {
+        if (id === 0) {
+            let bfm = mc.newCustomForm().setTitle("离线封禁操作")
+                .addLabel("封禁目标: " + pData.name + "\n目标XUID: " + targetXuid)
+                .addInput("封禁时长 (单位: 天)", "留空则代表永久封禁")
+                .addInput("封禁理由/备注", "...", tr(pl, "ban.reason.default"));
+            pl.sendForm(bfm, (pl2, data) => {
+                if(!data) return;
+                let days = parseFloat(data[1]);
+                if(isNaN(days) || days <= 0) days = null;
+                let reason = (data[2] || "").trim();
+                if (reason === "") reason = tr(pl2, "ban.reason.default");
+                processBan(pl2, targetXuid, null, days, reason);
+            });
+        } else if (id === 1) {
+            let mfm = mc.newCustomForm().setTitle("离线资金管理").addInput("输入需要为该玩家增加或扣除的金币数值 (负数代表扣除)", "0");
+            pl.sendForm(mfm, (pl2, data) => {
+                if(data) {
+                    let amt = parseInt(data[0]);
+                    if(!isNaN(amt) && amt !== 0) {
+                        let ecoType = config.get("economy").type;
+                        if (ecoType === "llmoney") {
+                            let current = money.get(targetXuid);
+                            money.set(targetXuid, current + amt);
+                            pl2.tell(PREFIX + "§a执行成功！离线资金操作已通过底层 LLMoney API 强行生效。");
+                        } else {
+                            let offDb = JSON.parse(offlineDb.read() || "{}");
+                            if (!offDb[targetXuid]) offDb[targetXuid] = [];
+                            let tm = system.getTimeStr();
+                            offDb[targetXuid].push({
+                                senderName: pl2.realName,
+                                senderXuid: pl2.xuid,
+                                amount: amt,
+                                time: tm,
+                                note: "管理员资金操作"
+                            });
+                            offlineDb.write(JSON.stringify(offDb, null, 4));
+                            pl2.tell(PREFIX + "§a执行成功！由于使用记分板经济，款项操作已存入离线队列，将在目标下次上线时自动生效。");
+                        }
+                        csvLog("OfflineMoneyAdmin", pl2.realName, `Adjusted offline money for ${pData.name} by ${amt}`);
+                    }
+                }
+            });
+        }
+    });
 }
 
 ll.export(() => {
@@ -2585,16 +2902,16 @@ ll.export(() => {
 ll.export((xuid) => {
     if (!config.get("playerDatabase") || !config.get("playerDatabase").enabled) return null;
     if (!xuid) return null;
-    let pData = pdbDb.get(xuid);
+    let raw = pdbKV.get(xuid);
+    let pData = raw ? JSON.parse(raw) : null;
     return pData ? (pData.OnlineTime || 0) : 0;
 }, "UEssential", "getOnlineTime");
 
 ll.export((xuid, name, ip, clientId) => {
     if (!config.get("ban") || !config.get("ban").enabled) return null;
-    let pureIp = getPureIp(ip);
+    let pureIp = getPureIp(ip); 
     return checkLocalBan(xuid, name, pureIp, clientId).banned;
 }, "UEssential", "isBanned");
-
 
 logger.setTitle("UEssential");
 logger.info("UEssential " + VERSION.join(".") + " 加载成功！作者：wuw111。BUG反馈或功能建议欢迎加入反馈群：1097933637。本插件为免费插件，如果您是花钱购买的，请立刻投诉商家并且要求退款。");
