@@ -12,7 +12,7 @@ Copyright (c) 2024-2026 wuw111. All rights reserved.
 -----------------------------------------------------------------------*/
 
 const PLUGIN_NAME = "UEssential";
-const VERSION = [1, 2, 0];
+const VERSION = [1, 2, 1];
 const PREFIX = "§b§l[UEssential]§r ";
 const DIR_PATH = "plugins/" + PLUGIN_NAME;
 const LANG_PATH = DIR_PATH + "/lang";
@@ -100,6 +100,9 @@ for (let key in DEFAULT_CONFIG) {
 
 const defaultLangData = {
     "zh_CN": {
+        "general.none": "无",
+        "general.unknown": "未知",
+        "general.back": "返回上级菜单",
         "lang.switched": "已切换语言至 {lang} / Language switched to {lang}",
         "lang.title": "切换语言 / Switch Language",
         "lang.desc": "请选择您的偏好语言：\nPlease select your preferred language:",
@@ -200,6 +203,26 @@ const defaultLangData = {
         "eco.transfer.success.target": "您收到了来自 {name} 的 {amount} 金币转账！",
         "eco.transfer.rollback": "系统错误：向对方加款失败，已退还您的转账与税金！",
         "eco.transfer.fail": "系统错误：扣款失败！",
+        "eco.offline.receive": "§a您收到了一笔离线转账/拨款！\n§e金额: §a{amount}\n§e发件人: §b{sender}\n§e时间: §7{time}\n§e留言: §f{note}",
+        "eco.offline.deduct": "§c系统在您离线期间扣除了款项！\n§e金额: §c{amount}\n§e操作人: §b{sender}\n§e时间: §7{time}\n§e留言: §f{note}",
+        "eco.transfer.offline_search_hint": "--- 使用下方输入框搜索离线玩家 ---",
+        "eco.transfer.search_input": "或输入要搜索的离线玩家名称 (留空则使用上方下拉列表)",
+        "eco.transfer.search_ph": "最少3个字符",
+        "eco.transfer.note_input": "转账备注留言 (可选)",
+        "eco.transfer.note_ph": "最多50字",
+        "eco.transfer.note_toolong": "§c转账备注过长！最多50个字符。",
+        "eco.transfer.search_tooshort": "§c搜索名称太短，请至少输入 {min} 个字符以防止误操作。",
+        "eco.transfer.search_none": "§c未找到任何匹配该名称的玩家记录！",
+        "eco.transfer.select.title": "选择转账目标",
+        "eco.transfer.select.desc": "找到多个匹配项，请点击以选择确切的收款玩家：",
+        "eco.transfer.last_online": "最后上线: {time}",
+        "eco.transfer.err.noselect": "§c操作失败：请从下拉列表中选择有效的在线玩家，或者在下方输入框填写离线玩家名称！",
+        "eco.transfer.confirm.title": "转账最终确认",
+        "eco.transfer.confirm.desc": "§e收款人: §a{name}\n§e转账金额: §a{amount}\n§e手续费: §c{tax}\n§e总扣除: §c{total}\n§e备注留言: §f{note}\n\n您确认要立即执行此转账吗？",
+        "eco.transfer.confirm.yes": "确认转账",
+        "eco.transfer.confirm.no": "取消",
+        "eco.receive.online": "§a您收到了一笔转账！\n§e金额: §a{amount}\n§e发件人: §b{sender}\n§e留言: §f{note}",
+        "eco.transfer.offline_pending": "§e目标玩家当前离线，由于使用记分板经济，款项已在系统暂存，将在对方下次上线时自动到账。",
 
         "home.disabled": "家园系统目前已关闭。",
         "home.not_found": "找不到名为 {name} 的家园传送点。",
@@ -285,9 +308,123 @@ const defaultLangData = {
         "notice.title": "§l服务器公告",
         "notice.btn.ok": "确定",
         "notice.btn.never": "收到且不再展示",
-        "notice.set_never": "已设置不再自动弹出此公告。"
+        "notice.set_never": "已设置不再自动弹出此公告。",
+
+        "cuscmd.error.deleted": "此自定义命令已被管理员删除，将在下一次服务器重启后完全清除。",
+        "cuscmd.manage.title": "自定义命令管理",
+        "cuscmd.manage.desc": "利用此功能，可桥接任意插件或原版指令系统：",
+        "cuscmd.manage.create": "创建自定义命令",
+        "cuscmd.manage.delete": "删除自定义命令",
+        "cuscmd.error.perm": "§c权限不足：必须为配置表中的超级管理员才可删除自定义命令！",
+        "cuscmd.form.name": "主命令名称 (纯小写字母/字母+数字，禁止纯数字或特殊符号)",
+        "cuscmd.form.name_ph": "如: test",
+        "cuscmd.form.desc": "命令简介/描述",
+        "cuscmd.form.desc_ph": "出现在玩家输入时的补全提示中",
+        "cuscmd.form.desc_def": "自定义映射命令",
+        "cuscmd.form.alias": "辅助别名 (可选，纯小写字母/数字，禁止纯数字或特殊符号)",
+        "cuscmd.form.alias_ph": "留空则不设置别名",
+        "cuscmd.form.target": "映射的目标命令 (支持变量 %name%)",
+        "cuscmd.form.target_ph": "如: warp go 主城",
+        "cuscmd.form.executor": "指令执行者身份",
+        "cuscmd.form.exec_player": "玩家身份执行",
+        "cuscmd.form.exec_console": "以控制台权限执行",
+        "cuscmd.form.append": "接收后续不确定参数并自动追加？\n(若开启，/命令 [参数] 均会向后拼接)",
+        "cuscmd.err.name_invalid": "§c注册失败：命令名称非法！必须仅包含小写英文字母与数字。",
+        "cuscmd.err.name_num": "§c注册失败：命令名称不能为纯数字！请包含至少一个英文字母。",
+        "cuscmd.err.alias_invalid": "§c注册失败：别名非法！必须仅包含小写英文字母与数字。",
+        "cuscmd.err.alias_num": "§c注册失败：命令别名不能为纯数字！",
+        "cuscmd.err.target_empty": "§c注册失败：目标映射命令不能为空！",
+        "cuscmd.err.admin_only": "§c注册失败：高危权限拦截！您并非指定的超级管理员，无法创建“控制台”级别的映射指令。",
+        "cuscmd.err.exists": "§c注册失败：该自定义命令映射已经存在！",
+        "cuscmd.success.create": "§a高级指令桥接映射 /{cmd} 创建成功并已上线！",
+        "cuscmd.err.conflict": "§c指令上线失败：该命令标识符已被原版系统或其他插件锁定占用。",
+        "cuscmd.del.none": "§c当前运行环境中没有任何可用的自定义命令。",
+        "cuscmd.del.desc": "请选择需要注销的指令项：\n(警告：删除后即刻失效，但客户端提示需在服务器重启后方可完全清除)",
+        "cuscmd.success.delete": "§a指令映射 /{cmd} 已被强制吊销。",
+
+        "pm.err.not_found": "§c找不到目标玩家！",
+        "pm.success.look": "§a已进入旁观模式并传送到 {name}",
+        "pm.success.money": "§a已强制调整玩家资金: {amount}",
+        "pm.success.crash": "§a已向客户端发送崩溃指令。",
+        "pm.err.unknown_action": "§c未知操作。",
+        "pm.main.desc": "请选择一个在线玩家进行操作：",
+        "pm.err.no_online": "§c当前无在线玩家",
+        "pm.target.title": "管理: {name}",
+        "pm.target.desc": "请选择你要对该玩家进行的操作：",
+        "pm.target.btn.look": "视奸 (Spectate)",
+        "pm.target.btn.talk": "替身发言 (Talk As)",
+        "pm.target.btn.cmd": "替身执行命令 (Command As)",
+        "pm.target.btn.money": "资金管理 (Money)",
+        "pm.target.btn.status": "查看状态信息 (Status)",
+        "pm.target.btn.ban": "反作弊-加入黑名单 (Ban)",
+        "pm.target.btn.crash": "反作弊-崩溃客户端 (Crash)",
+        "pm.target.btn.kick": "反作弊-踢出玩家 (Kick)",
+        "pm.err.offline": "§c目标玩家已离线或无效",
+        "pm.talk.title": "替身发言",
+        "pm.talk.input": "输入发言内容",
+        "pm.cmd.title": "替身执行命令",
+        "pm.cmd.input": "输入需代为执行的命令 (不带/)",
+        "pm.money.title": "资金管理",
+        "pm.money.input": "输入增加或减少的金币数值 (负数为减少)",
+        "pm.money.success": "§a强制资金操作已生效。",
+        "pm.kick.title": "踢出玩家",
+        "pm.kick.input": "踢出理由 (可选)",
+        "pm.kick.def": "违规",
+        "pm.kick.fallback": "被管理员踢出服务器",
+        "pm.ban.title": "加入黑名单",
+        "pm.ban.label": "目标: {name} ({xuid})",
+        "pm.ban.days": "封禁时长 (天), 留空为永久",
+        "pm.ban.reason": "封禁理由",
+        "pm.status.title": "玩家信息: {name}",
+        "pm.status.info": "名称: {name}\nXUID: {xuid}\nUUID: {uuid}\nIP: {ip}\nClientID: {cid}\nOS: {os}\n累积在线时长: {time} 分钟\n\n--- 背包物品 (点击审查NBT) ---",
+        "pm.status.item": "数量: {count} | 格子编号: {slot}",
+        "pm.status.no_nbt": "该物品无 NBT 数据附着",
+        "pm.status.nbt_title": "物品 NBT 审查 [插槽 {slot}]",
+        "pm.status.nbt_info": "物品: {name}\n数量: {count}\n类型ID: {type}\n\n==== NBT 结构 ====\n{nbt}",
+        "pm.status.btn.back": "返回上级菜单",
+        "pm.status.btn.copy": "复制该物品到我的背包",
+        "pm.status.copy.success": "§a物品已成功复制到你的背包！",
+        "pm.status.copy.fail": "§c复制失败：你的背包已满或无法获取背包对象。",
+        "pm.status.item.empty": "§c该槽位物品已被移动或变为空！",
+        "pm.off.title": "离线玩家管理: {name}",
+        "pm.off.info": "当前名: {name}\n曾用名: {history}\nXUID: {xuid}\nIP地址历史: {ips}\n设备ClientID历史: {cids}\n服务器累积游玩时长: {time} 分钟\n最后上线记录: {last}\n\n§c[注意]§r 目标目前处于离线状态，背包等游戏内动态数据无法获取。",
+        "pm.off.btn.ban": "加入黑名单 (Offline Ban)",
+        "pm.off.btn.money": "资金管理 (Offline Money)",
+        "pm.off.ban.title": "离线封禁操作",
+        "pm.off.ban.label": "封禁目标: {name}\n目标XUID: {xuid}",
+        "pm.off.ban.days": "封禁时长 (单位: 天)",
+        "pm.off.ban.days_ph": "留空则代表永久封禁",
+        "pm.off.ban.reason": "封禁理由/备注",
+        "pm.off.money.title": "离线资金管理",
+        "pm.off.money.input": "输入需要为该玩家增加或扣除的金币数值 (负数代表扣除)",
+        "pm.off.money.success_ll": "§a执行成功！离线资金操作已通过底层 LLMoney API 强行生效。",
+        "pm.off.money.note": "管理员资金操作",
+        "pm.off.money.success_sb": "§a执行成功！由于使用记分板经济，款项操作已存入离线队列，将在目标下次上线时自动生效。",
+
+        "pdb.refresh.success": "§a数据库已计算刷新完毕。当前KVDB内记录总数: {kv} | 注册记录数: {reg}",
+        "pdb.export.success": "§a操作成功！数据库全量数据已手动导出至文件: {path}",
+        "pdb.query.usage": "§c指令使用错误：请输入要搜索的玩家名称片段！用法: /playerdatabase query [名字]",
+        "pdb.query.short": "§c搜索字段太短！为防止误操作和服务器卡顿，请至少输入 {min} 个字符。",
+        "pdb.query.none": "§c检索完毕：未在数据库中找到任何匹配该名称的玩家记录。",
+        "pdb.info.title": "玩家数据库信息",
+        "pdb.info.desc": "历史总注册玩家数: {total}\n\n7日内新注册玩家名单:",
+        "pdb.info.player": "[{name}]\n注册: {date} {time} | 游玩: {play}分钟",
+        "pdb.info.none": "历史总注册玩家数: {total}\n\n近7日内无任何新注册玩家记录。",
+        "pdb.query.title": "检索结果: {query}",
+        "pdb.query.desc": "检索完毕，共找到 {count} 名符合条件的玩家，点击可查看详情并执行管理操作：",
+        "pdb.query.btn": "{name}\nXUID: {xuid} | 上线: {last}",
+
+        "api.eco.add.online": "§a您收到了一笔通过系统 API 下发的拨款！\n§e金额: §a{amount}\n§e操作方: §b{sender}\n§e留言: §f{note}",
+        "api.eco.reduce.online": "§c系统通过 API 扣除了您的部分资金！\n§e金额: §c{amount}\n§e操作方: §b{sender}\n§e留言: §f{note}"
     }
 };
+
+for (let locale in defaultLangData) {
+    let langFile = LANG_PATH + "/" + locale + ".json";
+    if (!File.exists(langFile)) {
+        File.writeTo(langFile, JSON.stringify(defaultLangData[locale], null, 4));
+    }
+}
 
 i18n.load(LANG_PATH, config.get("language"), defaultLangData);
 
@@ -745,12 +882,12 @@ mc.listen("onJoin", (player) => {
                 for (let r of records) {
                     if (r.amount > 0) {
                         Eco.add(p, r.amount);
-                        p.tell(PREFIX + `§a您收到了一笔离线转账/拨款！\n§e金额: §a${r.amount}\n§e发件人: §b${r.senderName}\n§e时间: §7${r.time}\n§e留言: §f${r.note || "无"}`);
+                        p.tell(PREFIX + tr(p, "eco.offline.receive", { amount: r.amount, sender: r.senderName, time: r.time, note: r.note || tr(p, "general.none") }));
                     } else if (r.amount < 0) {
                         let absAmt = Math.abs(r.amount);
                         let current = Eco.get(p);
                         Eco.set(p, current + r.amount);
-                        p.tell(PREFIX + `§c系统在您离线期间扣除了款项！\n§e金额: §c${absAmt}\n§e操作人: §b${r.senderName}\n§e时间: §7${r.time}\n§e留言: §f${r.note || "无"}`);
+                        p.tell(PREFIX + tr(p, "eco.offline.deduct", { amount: absAmt, sender: r.senderName, time: r.time, note: r.note || tr(p, "general.none") }));
                     }
                 }
                 delete offTransfers[player.xuid];
@@ -941,7 +1078,6 @@ function startTprSearch(player, cost, dimCfg, attempts, originalPos, cfg) {
         }
     }, cfg.loadDelayMs);
 }
-
 
 function getAvgTps(expectedSeconds) {
     if (tickTotalCount < 2) return (20.00).toFixed(2);
@@ -2137,16 +2273,16 @@ function sendMoneyMainForm(player) {
 function sendTransferForm(player) {
     let onlinePlayers = mc.getOnlinePlayers().filter(p => p.xuid !== player.xuid);
     let pList = onlinePlayers.map(p => ({ xuid: p.xuid, name: p.realName }));
-    pList.unshift({xuid: null, name: "--- 使用下方输入框搜索离线玩家 ---"});
+    pList.unshift({xuid: null, name: tr(player, "eco.transfer.offline_search_hint")});
 
     let taxRate = config.get("economy").transferTaxRate;
     let fm = mc.newCustomForm()
         .setTitle(tr(player, "eco.transfer.title"))
         .addLabel(tr(player, "eco.transfer.desc", { tax: (taxRate * 100).toFixed(1) }))
         .addDropdown(tr(player, "eco.transfer.target"), pList.map(i => i.name), 0)
-        .addInput("或输入要搜索的离线玩家名称 (留空则使用上方下拉列表)", "最少3个字符", "")
-        .addInput(tr(player, "eco.transfer.amount"), "输入金额", "100")
-        .addInput("转账备注留言 (可选)", "最多50字", "");
+        .addInput(tr(player, "eco.transfer.search_input"), tr(player, "eco.transfer.search_ph"), "")
+        .addInput(tr(player, "eco.transfer.amount"), "100", "100")
+        .addInput(tr(player, "eco.transfer.note_input"), tr(player, "eco.transfer.note_ph"), "");
 
     player.sendForm(fm, (pl, data) => {
         if (data == null) return;
@@ -2156,7 +2292,7 @@ function sendTransferForm(player) {
         let note = (data[4] || "").trim();
 
         if (isNaN(amount) || amount <= 0) { sendMsg(pl, "eco.transfer.invalid"); return; }
-        if (note.length > 50) { pl.tell(PREFIX + "§c转账备注过长！最多50个字符。"); return; }
+        if (note.length > 50) { pl.tell(PREFIX + tr(pl, "eco.transfer.note_toolong")); return; }
         if (!checkWordFilter(note)) { sendMsg(pl, "wordfilter.blocked"); return; }
 
         let tax = Math.floor(amount * taxRate), totalCost = amount + tax;
@@ -2164,7 +2300,7 @@ function sendTransferForm(player) {
 
         if (searchName !== "") {
             let minLen = config.get("playerDatabase").queryMinLength || 3;
-            if (searchName.length < minLen) { pl.tell(PREFIX + `§c搜索名称太短，请至少输入 ${minLen} 个字符以防止误操作。`); return; }
+            if (searchName.length < minLen) { pl.tell(PREFIX + tr(pl, "eco.transfer.search_tooshort", { min: minLen })); return; }
             
             let keys = pdbKV.listKey();
             let matches = [];
@@ -2179,14 +2315,14 @@ function sendTransferForm(player) {
                 }
             }
             
-            if (matches.length === 0) { pl.tell(PREFIX + "§c未找到任何匹配该名称的玩家记录！"); return; }
+            if (matches.length === 0) { pl.tell(PREFIX + tr(pl, "eco.transfer.search_none")); return; }
             if (matches.length === 1) {
                 sendTransferConfirmForm(pl, matches[0].xuid, matches[0].data.name, amount, totalCost, tax, note);
             } else {
                 sendTransferSelectMatchForm(pl, matches, amount, totalCost, tax, note);
             }
         } else {
-            if (dropdownSelection === 0) { pl.tell(PREFIX + "§c操作失败：请从下拉列表中选择有效的在线玩家，或者在下方输入框填写离线玩家名称！"); return; }
+            if (dropdownSelection === 0) { pl.tell(PREFIX + tr(pl, "eco.transfer.err.noselect")); return; }
             let targetInfo = pList[dropdownSelection];
             sendTransferConfirmForm(pl, targetInfo.xuid, targetInfo.name, amount, totalCost, tax, note);
         }
@@ -2194,10 +2330,10 @@ function sendTransferForm(player) {
 }
 
 function sendTransferSelectMatchForm(player, matches, amount, totalCost, tax, note) {
-    let fm = mc.newSimpleForm().setTitle("选择转账目标").setContent("找到多个匹配项，请点击以选择确切的收款玩家：");
+    let fm = mc.newSimpleForm().setTitle(tr(player, "eco.transfer.select.title")).setContent(tr(player, "eco.transfer.select.desc"));
     matches.forEach(m => {
-        let lastOn = m.data.lastOnlineTime ? new Date(m.data.lastOnlineTime).toLocaleString() : "未知";
-        fm.addButton(`${m.data.name}\n最后上线: ${lastOn}`);
+        let lastOn = m.data.lastOnlineTime ? new Date(m.data.lastOnlineTime).toLocaleString() : tr(player, "general.unknown");
+        fm.addButton(`${m.data.name}\n${tr(player, "eco.transfer.last_online", { time: lastOn })}`);
     });
     player.sendForm(fm, (pl, id) => {
         if (id == null) return;
@@ -2207,10 +2343,10 @@ function sendTransferSelectMatchForm(player, matches, amount, totalCost, tax, no
 
 function sendTransferConfirmForm(player, targetXuid, targetName, amount, totalCost, tax, note) {
     let fm = mc.newSimpleForm()
-        .setTitle("转账最终确认")
-        .setContent(`§e收款人: §a${targetName}\n§e转账金额: §a${amount}\n§e手续费: §c${tax}\n§e总扣除: §c${totalCost}\n§e备注留言: §f${note || "无"}\n\n您确认要立即执行此转账吗？`)
-        .addButton("确认转账")
-        .addButton("取消");
+        .setTitle(tr(player, "eco.transfer.confirm.title"))
+        .setContent(tr(player, "eco.transfer.confirm.desc", { name: targetName, amount: amount, tax: tax, total: totalCost, note: note || tr(player, "general.none") }))
+        .addButton(tr(player, "eco.transfer.confirm.yes"))
+        .addButton(tr(player, "eco.transfer.confirm.no"));
         
     player.sendForm(fm, (pl, id) => {
         if (id !== 0) return;
@@ -2221,7 +2357,7 @@ function sendTransferConfirmForm(player, targetXuid, targetName, amount, totalCo
             if (targetPlayer) {
                 if (Eco.add(targetPlayer, amount)) {
                     sendMsg(pl, "eco.transfer.success.sender", { name: targetPlayer.realName, amount: amount, tax: tax });
-                    targetPlayer.tell(PREFIX + `§a您收到了一笔转账！\n§e金额: §a${amount}\n§e发件人: §b${pl.realName}\n§e留言: §f${note || "无"}`);
+                    targetPlayer.tell(PREFIX + tr(targetPlayer, "eco.receive.online", { amount: amount, sender: pl.realName, note: note || tr(targetPlayer, "general.none") }));
                     csvLog("Transfer", pl.realName, `Sent ${amount} to ${targetPlayer.realName} with tax ${tax} (Note: ${note})`);
                 } else {
                     Eco.add(pl, totalCost);
@@ -2250,7 +2386,7 @@ function sendTransferConfirmForm(player, targetXuid, targetName, amount, totalCo
                     });
                     offlineDb.write(JSON.stringify(offDb, null, 4));
                     sendMsg(pl, "eco.transfer.success.sender", { name: targetName, amount: amount, tax: tax });
-                    pl.tell(PREFIX + `§e目标玩家当前离线，由于使用记分板经济，款项已在系统暂存，将在对方下次上线时自动到账。`);
+                    pl.tell(PREFIX + tr(pl, "eco.transfer.offline_pending"));
                     csvLog("TransferOffline", pl.realName, `Sent ${amount} to offline ${targetName} with tax ${tax} (Note: ${note})`);
                 }
             }
@@ -2300,7 +2436,7 @@ function setupDynamicCmd(cmdName, cmdData) {
         
         let liveCmds = cusCmdDb.get("list") || {};
         if (!liveCmds[cmdName]) {
-            out.error("此自定义命令已被管理员删除，将在下一次服务器重启后完全清除。");
+            out.error(tr(origin.player, "cuscmd.error.deleted"));
             return;
         }
 
@@ -2342,17 +2478,17 @@ function registerCusCmdSys() {
 
 function sendCusCmdManageForm(player) {
     let fm = mc.newSimpleForm()
-        .setTitle("自定义命令管理")
-        .setContent("利用此功能，可桥接任意插件或原版指令系统：")
-        .addButton("创建自定义命令")
-        .addButton("删除自定义命令");
+        .setTitle(tr(player, "cuscmd.manage.title"))
+        .setContent(tr(player, "cuscmd.manage.desc"))
+        .addButton(tr(player, "cuscmd.manage.create"))
+        .addButton(tr(player, "cuscmd.manage.delete"));
 
     player.sendForm(fm, (pl, id) => {
         if (id === 0) sendCusCmdCreateForm(pl);
         else if (id === 1) {
             let isSuper = config.get("customCommands").superAdmins.includes(pl.xuid);
             if (!isSuper) {
-                pl.tell(PREFIX + "§c权限不足：必须为配置表中的超级管理员才可删除自定义命令！");
+                pl.tell(PREFIX + tr(pl, "cuscmd.error.perm"));
                 return;
             }
             sendCusCmdDeleteForm(pl);
@@ -2362,13 +2498,13 @@ function sendCusCmdManageForm(player) {
 
 function sendCusCmdCreateForm(player) {
     let fm = mc.newCustomForm()
-        .setTitle("创建自定义命令")
-        .addInput("主命令名称 (纯小写字母/字母+数字，禁止纯数字或特殊符号)", "如: test")
-        .addInput("命令简介/描述", "出现在玩家输入时的补全提示中", "自定义映射命令")
-        .addInput("辅助别名 (可选，纯小写字母/数字，禁止纯数字或特殊符号)", "留空则不设置别名")
-        .addInput("映射的目标命令 (支持变量 %name%)", "如: warp go 主城")
-        .addDropdown("指令执行者身份", ["玩家身份执行", "以控制台权限执行"], 0)
-        .addSwitch("接收后续不确定参数并自动追加？\n(若开启，/命令 [参数] 均会向后拼接)", false);
+        .setTitle(tr(player, "cuscmd.manage.create"))
+        .addInput(tr(player, "cuscmd.form.name"), tr(player, "cuscmd.form.name_ph"))
+        .addInput(tr(player, "cuscmd.form.desc"), tr(player, "cuscmd.form.desc_ph"), tr(player, "cuscmd.form.desc_def"))
+        .addInput(tr(player, "cuscmd.form.alias"), tr(player, "cuscmd.form.alias_ph"))
+        .addInput(tr(player, "cuscmd.form.target"), tr(player, "cuscmd.form.target_ph"))
+        .addDropdown(tr(player, "cuscmd.form.executor"), [tr(player, "cuscmd.form.exec_player"), tr(player, "cuscmd.form.exec_console")], 0)
+        .addSwitch(tr(player, "cuscmd.form.append"), false);
 
     player.sendForm(fm, (pl, data) => {
         if (data == null) return;
@@ -2380,35 +2516,35 @@ function sendCusCmdCreateForm(player) {
         let hasArgs = data[5];
 
         if (!/^[a-z0-9]+$/.test(cmdName)) {
-            pl.tell(PREFIX + "§c注册失败：命令名称非法！必须仅包含小写英文字母与数字。");
+            pl.tell(PREFIX + tr(pl, "cuscmd.err.name_invalid"));
             return;
         }
         if (/^\d+$/.test(cmdName)) {
-            pl.tell(PREFIX + "§c注册失败：命令名称不能为纯数字！请包含至少一个英文字母。");
+            pl.tell(PREFIX + tr(pl, "cuscmd.err.name_num"));
             return;
         }
         if (alias !== "" && !/^[a-z0-9]+$/.test(alias)) {
-            pl.tell(PREFIX + "§c注册失败：别名非法！必须仅包含小写英文字母与数字。");
+            pl.tell(PREFIX + tr(pl, "cuscmd.err.alias_invalid"));
             return;
         }
         if (alias !== "" && /^\d+$/.test(alias)) {
-            pl.tell(PREFIX + "§c注册失败：命令别名不能为纯数字！");
+            pl.tell(PREFIX + tr(pl, "cuscmd.err.alias_num"));
             return;
         }
         if (targetCmd === "") {
-            pl.tell(PREFIX + "§c注册失败：目标映射命令不能为空！");
+            pl.tell(PREFIX + tr(pl, "cuscmd.err.target_empty"));
             return;
         }
 
         let isSuper = config.get("customCommands").superAdmins.includes(pl.xuid);
         if (runAsConsole && !isSuper) {
-            pl.tell(PREFIX + "§c注册失败：高危权限拦截！您并非指定的超级管理员，无法创建“控制台”级别的映射指令。");
+            pl.tell(PREFIX + tr(pl, "cuscmd.err.admin_only"));
             return;
         }
 
         let cmds = cusCmdDb.get("list") || {};
         if (cmds[cmdName]) {
-            pl.tell(PREFIX + "§c注册失败：该自定义命令映射已经存在！");
+            pl.tell(PREFIX + tr(pl, "cuscmd.err.exists"));
             return;
         }
 
@@ -2425,10 +2561,10 @@ function sendCusCmdCreateForm(player) {
 
         try {
             setupDynamicCmd(cmdName, cmdData);
-            pl.tell(PREFIX + "§a高级指令桥接映射 /" + cmdName + " 创建成功并已上线！");
+            pl.tell(PREFIX + tr(pl, "cuscmd.success.create", { cmd: cmdName }));
             csvLog("CustomCommand", pl.realName, "Created CMD map " + cmdName);
         } catch (e) {
-            pl.tell(PREFIX + "§c指令上线失败：该命令标识符已被原版系统或其他插件锁定占用。");
+            pl.tell(PREFIX + tr(pl, "cuscmd.err.conflict"));
         }
     });
 }
@@ -2437,13 +2573,13 @@ function sendCusCmdDeleteForm(player) {
     let cmds = cusCmdDb.get("list") || {};
     let names = Object.keys(cmds);
     if (names.length === 0) {
-        player.tell(PREFIX + "§c当前运行环境中没有任何可用的自定义命令。");
+        player.tell(PREFIX + tr(player, "cuscmd.del.none"));
         return;
     }
 
     let fm = mc.newSimpleForm()
-        .setTitle("删除自定义命令")
-        .setContent("请选择需要注销的指令项：\n(警告：删除后即刻失效，但客户端提示需在服务器重启后方可完全清除)");
+        .setTitle(tr(player, "cuscmd.manage.delete"))
+        .setContent(tr(player, "cuscmd.del.desc"));
 
     names.forEach(n => fm.addButton("/" + n));
 
@@ -2455,7 +2591,7 @@ function sendCusCmdDeleteForm(player) {
         if (freshCmds[delName]) {
             delete freshCmds[delName];
             cusCmdDb.set("list", freshCmds);
-            pl.tell(PREFIX + "§a指令映射 /" + delName + " 已被强制吊销。");
+            pl.tell(PREFIX + tr(pl, "cuscmd.success.delete", { cmd: delName }));
             csvLog("CustomCommand", pl.realName, "Revoked CMD map " + delName);
         }
     });
@@ -2481,7 +2617,7 @@ function registerPlayerManageCommands() {
             return;
         }
         if (results.target.length === 0) {
-            admin.tell("§c找不到目标玩家！");
+            admin.tell(tr(admin, "pm.err.not_found"));
             return;
         }
         let targetPlayer = results.target[0];
@@ -2498,7 +2634,7 @@ function registerPlayerManageCommands() {
             case "look":
                 admin.setGameMode(6);
                 admin.teleport(targetPlayer.pos.x, targetPlayer.pos.y, targetPlayer.pos.z, targetPlayer.pos.dimid);
-                admin.tell("§a已进入旁观模式并传送到 " + targetPlayer.realName);
+                admin.tell(tr(admin, "pm.success.look", { name: targetPlayer.realName }));
                 break;
             case "talkas":
                 if(content !== "") targetPlayer.talkAs(content);
@@ -2511,7 +2647,7 @@ function registerPlayerManageCommands() {
                 if(!isNaN(amt)) {
                     let current = Eco.get(targetPlayer);
                     Eco.set(targetPlayer, current + amt);
-                    admin.tell("§a已强制调整玩家资金: " + amt);
+                    admin.tell(tr(admin, "pm.success.money", { amount: amt }));
                 }
                 break;
             case "status":
@@ -2519,10 +2655,10 @@ function registerPlayerManageCommands() {
                 break;
             case "crash":
                 targetPlayer.crash();
-                admin.tell("§a已向客户端发送崩溃指令。");
+                admin.tell(tr(admin, "pm.success.crash"));
                 break;
             default:
-                admin.tell("§c未知操作。");
+                admin.tell(tr(admin, "pm.err.unknown_action"));
                 break;
         }
     });
@@ -2531,8 +2667,8 @@ function registerPlayerManageCommands() {
 
 function sendPMMainMenu(admin) {
     let players = mc.getOnlinePlayers();
-    if(players.length === 0) { admin.tell("§c当前无在线玩家"); return; }
-    let fm = mc.newSimpleForm().setTitle("PlayerManage").setContent("请选择一个在线玩家进行操作：");
+    if(players.length === 0) { admin.tell(tr(admin, "pm.err.no_online")); return; }
+    let fm = mc.newSimpleForm().setTitle("PlayerManage").setContent(tr(admin, "pm.main.desc"));
     players.forEach(p => fm.addButton(p.realName));
     admin.sendForm(fm, (pl, id) => {
         if(id != null) sendPMTargetMenu(pl, players[id]);
@@ -2541,17 +2677,17 @@ function sendPMMainMenu(admin) {
 
 function sendPMTargetMenu(admin, targetPlayer) {
     if(!targetPlayer || targetPlayer.isSimulatedPlayer()) {
-        admin.tell("§c目标玩家已离线或无效"); return;
+        admin.tell(tr(admin, "pm.err.offline")); return;
     }
-    let fm = mc.newSimpleForm().setTitle("管理: " + targetPlayer.realName).setContent("请选择你要对该玩家进行的操作：")
-        .addButton("视奸 (Spectate)")
-        .addButton("替身发言 (Talk As)")
-        .addButton("替身执行命令 (Command As)")
-        .addButton("资金管理 (Money)")
-        .addButton("查看状态信息 (Status)")
-        .addButton("反作弊-加入黑名单 (Ban)")
-        .addButton("反作弊-崩溃客户端 (Crash)")
-        .addButton("反作弊-踢出玩家 (Kick)");
+    let fm = mc.newSimpleForm().setTitle(tr(admin, "pm.target.title", { name: targetPlayer.realName })).setContent(tr(admin, "pm.target.desc"))
+        .addButton(tr(admin, "pm.target.btn.look"))
+        .addButton(tr(admin, "pm.target.btn.talk"))
+        .addButton(tr(admin, "pm.target.btn.cmd"))
+        .addButton(tr(admin, "pm.target.btn.money"))
+        .addButton(tr(admin, "pm.target.btn.status"))
+        .addButton(tr(admin, "pm.target.btn.ban"))
+        .addButton(tr(admin, "pm.target.btn.crash"))
+        .addButton(tr(admin, "pm.target.btn.kick"));
         
     admin.sendForm(fm, (pl, id) => {
         if(id == null) return;
@@ -2559,29 +2695,29 @@ function sendPMTargetMenu(admin, targetPlayer) {
             case 0:
                 pl.setGameMode(6);
                 pl.teleport(targetPlayer.pos.x, targetPlayer.pos.y, targetPlayer.pos.z, targetPlayer.pos.dimid);
-                pl.tell("§a已进入旁观模式并传送到 " + targetPlayer.realName);
+                pl.tell(tr(pl, "pm.success.look", { name: targetPlayer.realName }));
                 break;
             case 1:
-                let fm1 = mc.newCustomForm().setTitle("替身发言").addInput("输入发言内容", "");
+                let fm1 = mc.newCustomForm().setTitle(tr(pl, "pm.talk.title")).addInput(tr(pl, "pm.talk.input"), "");
                 pl.sendForm(fm1, (pl2, data) => {
                     if(data && (data[0] || "") !== "") targetPlayer.talkAs(data[0]);
                 });
                 break;
             case 2:
-                let fm2 = mc.newCustomForm().setTitle("替身执行命令").addInput("输入需代为执行的命令 (不带/)", "");
+                let fm2 = mc.newCustomForm().setTitle(tr(pl, "pm.cmd.title")).addInput(tr(pl, "pm.cmd.input"), "");
                 pl.sendForm(fm2, (pl2, data) => {
                     if(data && (data[0] || "") !== "") targetPlayer.runcmd(data[0].startsWith("/") ? data[0].substring(1) : data[0]);
                 });
                 break;
             case 3:
-                let fm3 = mc.newCustomForm().setTitle("资金管理").addInput("输入增加或减少的金币数值 (负数为减少)", "0");
+                let fm3 = mc.newCustomForm().setTitle(tr(pl, "pm.money.title")).addInput(tr(pl, "pm.money.input"), "0");
                 pl.sendForm(fm3, (pl2, data) => {
                     if(data) {
                         let amt = parseInt(data[0]);
                         if(!isNaN(amt) && amt !== 0) {
                             let current = Eco.get(targetPlayer);
                             Eco.set(targetPlayer, current + amt);
-                            pl2.tell("§a强制资金操作已生效。");
+                            pl2.tell(tr(pl2, "pm.money.success"));
                         }
                     }
                 });
@@ -2594,12 +2730,12 @@ function sendPMTargetMenu(admin, targetPlayer) {
                 break;
             case 6:
                 targetPlayer.crash();
-                pl.tell("§a已发送客户端崩溃指令。");
+                pl.tell(tr(pl, "pm.success.crash"));
                 break;
             case 7:
-                let fm7 = mc.newCustomForm().setTitle("踢出玩家").addInput("踢出理由 (可选)", "", "违规");
+                let fm7 = mc.newCustomForm().setTitle(tr(pl, "pm.kick.title")).addInput(tr(pl, "pm.kick.input"), "", tr(pl, "pm.kick.def"));
                 pl.sendForm(fm7, (pl2, data) => {
-                    if(data) targetPlayer.kick(data[0] || "被管理员踢出服务器");
+                    if(data) targetPlayer.kick(data[0] || tr(pl2, "pm.kick.fallback"));
                 });
                 break;
         }
@@ -2607,10 +2743,10 @@ function sendPMTargetMenu(admin, targetPlayer) {
 }
 
 function sendBanFormForTarget(admin, targetPlayer) {
-    let fm = mc.newCustomForm().setTitle("加入黑名单")
-        .addLabel("目标: " + targetPlayer.realName + " (" + targetPlayer.xuid + ")")
-        .addInput("封禁时长 (天), 留空为永久", "留空为永久")
-        .addInput("封禁理由", "...", tr(admin, "ban.reason.default"));
+    let fm = mc.newCustomForm().setTitle(tr(admin, "pm.ban.title"))
+        .addLabel(tr(admin, "pm.ban.label", { name: targetPlayer.realName, xuid: targetPlayer.xuid }))
+        .addInput(tr(admin, "pm.ban.days"), tr(admin, "pm.off.ban.days_ph"))
+        .addInput(tr(admin, "pm.ban.reason"), "...", tr(admin, "ban.reason.default"));
     admin.sendForm(fm, (pl, data) => {
         if(!data) return;
         let days = parseFloat(data[1]);
@@ -2623,28 +2759,21 @@ function sendBanFormForTarget(admin, targetPlayer) {
 function sendPMStatusMenu(admin, targetPlayer) {
     let dv = targetPlayer.getDevice();
     let ip = getPureIp(dv ? dv.ip : targetPlayer.ip);
-    let cid = dv ? dv.clientId : "未知";
-    let os = dv ? dv.os : "未知";
+    let cid = dv ? dv.clientId : tr(admin, "general.unknown");
+    let os = dv ? dv.os : tr(admin, "general.unknown");
     
-    let onlineTime = "Null";
+    let onlineTime = "0.00";
     if(config.get("playerDatabase") && config.get("playerDatabase").enabled) {
         let raw = pdbKV.get(targetPlayer.xuid);
         if(raw) {
             let pData = JSON.parse(raw);
-            onlineTime = (pData.OnlineTime || 0).toFixed(2) + " 分钟";
+            onlineTime = (pData.OnlineTime || 0).toFixed(2);
         }
     }
 
-    let info = `名称: ${targetPlayer.realName}\n`;
-    info += `XUID: ${targetPlayer.xuid}\n`;
-    info += `UUID: ${targetPlayer.uuid}\n`;
-    info += `IP: ${ip}\n`;
-    info += `ClientID: ${cid}\n`;
-    info += `OS: ${os}\n`;
-    info += `累积在线时长: ${onlineTime}\n\n`;
-    info += `--- 背包物品 (点击审查NBT) ---`;
+    let info = tr(admin, "pm.status.info", { name: targetPlayer.realName, xuid: targetPlayer.xuid, uuid: targetPlayer.uuid, ip: ip, cid: cid, os: os, time: onlineTime });
 
-    let fm = mc.newSimpleForm().setTitle("玩家信息: " + targetPlayer.realName).setContent(info);
+    let fm = mc.newSimpleForm().setTitle(tr(admin, "pm.status.title", { name: targetPlayer.realName })).setContent(info);
     
     let inv = targetPlayer.getInventory();
     let slotMap = [];
@@ -2653,7 +2782,7 @@ function sendPMStatusMenu(admin, targetPlayer) {
         for(let i = 0; i < items.length; i++) {
             let it = items[i];
             if(!it.isNull()) {
-                fm.addButton(`${it.name}\n数量: ${it.count} | 格子编号: ${i}`);
+                fm.addButton(`${it.name}\n${tr(admin, "pm.status.item", { count: it.count, slot: i })}`);
                 slotMap.push(i);
             }
         }
@@ -2665,7 +2794,7 @@ function sendPMStatusMenu(admin, targetPlayer) {
         let onlinePs = mc.getOnlinePlayers();
         let stillOnline = onlinePs.find(p => p.xuid === targetPlayer.xuid);
         if (!stillOnline) {
-            pl.tell("§c目标玩家已离线，无法获取背包数据！");
+            pl.tell(tr(pl, "pm.err.offline"));
             return;
         }
 
@@ -2676,16 +2805,16 @@ function sendPMStatusMenu(admin, targetPlayer) {
             
             if (clickedItem && !clickedItem.isNull()) {
                 let nbt = clickedItem.getNbt();
-                let nbtStr = nbt ? nbt.toString(4) : "该物品无 NBT 数据附着";
+                let nbtStr = nbt ? nbt.toString(4) : tr(pl, "pm.status.no_nbt");
                 let isSuper = config.get("customCommands").superAdmins.includes(pl.xuid);
                 
                 let nbtFm = mc.newSimpleForm()
-                    .setTitle(`物品 NBT 审查 [插槽 ${slotIdx}]`)
-                    .setContent(`物品: ${clickedItem.name}\n数量: ${clickedItem.count}\n类型ID: ${clickedItem.type}\n\n==== NBT 结构 ====\n${nbtStr}`)
-                    .addButton("返回上级菜单");
+                    .setTitle(tr(pl, "pm.status.nbt_title", { slot: slotIdx }))
+                    .setContent(tr(pl, "pm.status.nbt_info", { name: clickedItem.name, count: clickedItem.count, type: clickedItem.type, nbt: nbtStr }))
+                    .addButton(tr(pl, "pm.status.btn.back"));
                     
                 if (isSuper) {
-                    nbtFm.addButton("复制该物品到我的背包");
+                    nbtFm.addButton(tr(pl, "pm.status.btn.copy"));
                 }
                 
                 pl.sendForm(nbtFm, (pl2, id2) => {
@@ -2697,15 +2826,15 @@ function sendPMStatusMenu(admin, targetPlayer) {
                         if (adminInv && adminInv.hasRoomFor(cloneItem)) {
                             adminInv.addItemToFirstEmptySlot(cloneItem);
                             pl2.refreshItems();
-                            pl2.tell(PREFIX + "§a物品已成功复制到你的背包！");
+                            pl2.tell(PREFIX + tr(pl2, "pm.status.copy.success"));
                         } else {
-                            pl2.tell(PREFIX + "§c复制失败：你的背包已满或无法获取背包对象。");
+                            pl2.tell(PREFIX + tr(pl2, "pm.status.copy.fail"));
                         }
                         sendPMStatusMenu(pl2, stillOnline);
                     }
                 });
             } else {
-                pl.tell("§c该槽位物品已被移动或变为空！");
+                pl.tell(tr(pl, "pm.status.item.empty"));
                 sendPMStatusMenu(pl, stillOnline);
             }
         }
@@ -2733,7 +2862,7 @@ function registerPlayerDatabaseCommand() {
             regDb.write(JSON.stringify(regData, null, 4));
             
             let kvKeys = pdbKV.listKey();
-            pl.tell(PREFIX + "§a数据库已计算刷新完毕。当前KVDB内记录总数: " + kvKeys.length + " | 注册记录数: " + count);
+            pl.tell(PREFIX + tr(pl, "pdb.refresh.success", { kv: kvKeys.length, reg: count }));
             sendPDBMenu(pl);
         } else if (action === "export") {
             let keys = pdbKV.listKey();
@@ -2747,16 +2876,16 @@ function registerPlayerDatabaseCommand() {
             let dateStr = Util.getTodayStr();
             let fp = dir + `/playerdatabase_manual_${dateStr}.json`;
             File.writeTo(fp, JSON.stringify(exportObj, null, 4));
-            pl.tell(PREFIX + "§a操作成功！数据库全量数据已手动导出至文件: " + fp);
+            pl.tell(PREFIX + tr(pl, "pdb.export.success", { path: fp }));
         } else if (action === "query") {
             let queryStr = results.param;
             if (!queryStr) {
-                pl.tell(PREFIX + "§c指令使用错误：请输入要搜索的玩家名称片段！用法: /playerdatabase query [名字]");
+                pl.tell(PREFIX + tr(pl, "pdb.query.usage"));
                 return;
             }
             let minLen = config.get("playerDatabase").queryMinLength || 3;
             if (queryStr.length < minLen) {
-                pl.tell(PREFIX + `§c搜索字段太短！为防止误操作和服务器卡顿，请至少输入 ${minLen} 个字符。`);
+                pl.tell(PREFIX + tr(pl, "pdb.query.short", { min: minLen }));
                 return;
             }
             let keys = pdbKV.listKey();
@@ -2772,7 +2901,7 @@ function registerPlayerDatabaseCommand() {
                 }
             }
             if (matches.length === 0) {
-                pl.tell(PREFIX + "§c检索完毕：未在数据库中找到任何匹配该名称的玩家记录。");
+                pl.tell(PREFIX + tr(pl, "pdb.query.none"));
             } else {
                 sendPdbQueryMatches(pl, matches, queryStr);
             }
@@ -2785,7 +2914,7 @@ function sendPDBMenu(admin) {
     let regData = JSON.parse(regDb.read() || '{"total":0,"records":{}}');
     let total = regData.total || 0;
     
-    let fm = mc.newSimpleForm().setTitle("玩家数据库信息").setContent(`历史总注册玩家数: ${total}\n\n7日内新注册玩家名单:`);
+    let fm = mc.newSimpleForm().setTitle(tr(admin, "pdb.info.title"));
     
     let now = Date.now();
     let sevendays = 7 * 86400000;
@@ -2798,22 +2927,24 @@ function sendPDBMenu(admin) {
             let raw = pdbKV.get(xuid);
             let pData = raw ? JSON.parse(raw) : null;
             let timePlay = pData ? (pData.OnlineTime || 0).toFixed(2) : "0.00";
-            fm.addButton(`[${rec.name}]\n注册: ${rec.date} ${rec.time} | 游玩: ${timePlay}分钟`);
+            fm.addButton(tr(admin, "pdb.info.player", { name: rec.name, date: rec.date, time: rec.time, play: timePlay }));
         }
     }
     
     if(count7 === 0) {
-        fm.setContent(`历史总注册玩家数: ${total}\n\n近7日内无任何新注册玩家记录。`);
+        fm.setContent(tr(admin, "pdb.info.none", { total: total }));
+    } else {
+        fm.setContent(tr(admin, "pdb.info.desc", { total: total }));
     }
     
     admin.sendForm(fm, (pl, id) => {});
 }
 
 function sendPdbQueryMatches(admin, matches, queryStr) {
-    let fm = mc.newSimpleForm().setTitle("检索结果: " + queryStr).setContent(`检索完毕，共找到 ${matches.length} 名符合条件的玩家，点击可查看详情并执行管理操作：`);
+    let fm = mc.newSimpleForm().setTitle(tr(admin, "pdb.query.title", { query: queryStr })).setContent(tr(admin, "pdb.query.desc", { count: matches.length }));
     matches.forEach(m => {
-        let lastOn = m.data.lastOnlineTime ? new Date(m.data.lastOnlineTime).toLocaleString() : "未知";
-        fm.addButton(`${m.data.name}\nXUID: ${m.xuid} | 上线: ${lastOn}`);
+        let lastOn = m.data.lastOnlineTime ? new Date(m.data.lastOnlineTime).toLocaleString() : tr(admin, "general.unknown");
+        fm.addButton(tr(admin, "pdb.query.btn", { name: m.data.name, xuid: m.xuid, last: lastOn }));
     });
     admin.sendForm(fm, (pl, id) => {
         if (id == null) return;
@@ -2828,26 +2959,23 @@ function sendPdbQueryMatches(admin, matches, queryStr) {
 }
 
 function sendPMStatusMenuForOffline(admin, targetXuid, pData) {
-    let fm = mc.newSimpleForm().setTitle("离线玩家管理: " + pData.name);
+    let fm = mc.newSimpleForm().setTitle(tr(admin, "pm.off.title", { name: pData.name }));
     let ips = (pData.IPs || []).join(", ");
     let cids = (pData.clientIDs || []).join(", ");
-    let lastOn = pData.lastOnlineTime ? new Date(pData.lastOnlineTime).toLocaleString() : "从未记录";
-    let onlineTime = (pData.OnlineTime || 0).toFixed(2) + " 分钟";
+    let lastOn = pData.lastOnlineTime ? new Date(pData.lastOnlineTime).toLocaleString() : tr(admin, "general.unknown");
+    let onlineTime = (pData.OnlineTime || 0).toFixed(2);
     
-    let content = `当前名: ${pData.name}\n曾用名: ${(pData.historyname || []).join(", ")}\nXUID: ${targetXuid}\n`;
-    content += `IP地址历史: ${ips}\n设备ClientID历史: ${cids}\n服务器累积游玩时长: ${onlineTime}\n最后上线记录: ${lastOn}\n\n§c[注意]§r 目标目前处于离线状态，背包等游戏内动态数据无法获取。`;
-    
-    fm.setContent(content);
-    fm.addButton("加入黑名单 (Offline Ban)");
-    fm.addButton("资金管理 (Offline Money)");
-    fm.addButton("返回");
+    fm.setContent(tr(admin, "pm.off.info", { name: pData.name, history: (pData.historyname || []).join(", "), xuid: targetXuid, ips: ips, cids: cids, time: onlineTime, last: lastOn }));
+    fm.addButton(tr(admin, "pm.off.btn.ban"));
+    fm.addButton(tr(admin, "pm.off.btn.money"));
+    fm.addButton(tr(admin, "general.back"));
     
     admin.sendForm(fm, (pl, id) => {
         if (id === 0) {
-            let bfm = mc.newCustomForm().setTitle("离线封禁操作")
-                .addLabel("封禁目标: " + pData.name + "\n目标XUID: " + targetXuid)
-                .addInput("封禁时长 (单位: 天)", "留空则代表永久封禁")
-                .addInput("封禁理由/备注", "...", tr(pl, "ban.reason.default"));
+            let bfm = mc.newCustomForm().setTitle(tr(pl, "pm.off.ban.title"))
+                .addLabel(tr(pl, "pm.off.ban.label", { name: pData.name, xuid: targetXuid }))
+                .addInput(tr(pl, "pm.off.ban.days"), tr(pl, "pm.off.ban.days_ph"))
+                .addInput(tr(pl, "pm.off.ban.reason"), "...", tr(pl, "ban.reason.default"));
             pl.sendForm(bfm, (pl2, data) => {
                 if(!data) return;
                 let days = parseFloat(data[1]);
@@ -2857,7 +2985,7 @@ function sendPMStatusMenuForOffline(admin, targetXuid, pData) {
                 processBan(pl2, targetXuid, null, days, reason);
             });
         } else if (id === 1) {
-            let mfm = mc.newCustomForm().setTitle("离线资金管理").addInput("输入需要为该玩家增加或扣除的金币数值 (负数代表扣除)", "0");
+            let mfm = mc.newCustomForm().setTitle(tr(pl, "pm.off.money.title")).addInput(tr(pl, "pm.off.money.input"), "0");
             pl.sendForm(mfm, (pl2, data) => {
                 if(data) {
                     let amt = parseInt(data[0]);
@@ -2866,7 +2994,7 @@ function sendPMStatusMenuForOffline(admin, targetXuid, pData) {
                         if (ecoType === "llmoney") {
                             let current = money.get(targetXuid);
                             money.set(targetXuid, current + amt);
-                            pl2.tell(PREFIX + "§a执行成功！离线资金操作已通过底层 LLMoney API 强行生效。");
+                            pl2.tell(PREFIX + tr(pl2, "pm.off.money.success_ll"));
                         } else {
                             let offDb = JSON.parse(offlineDb.read() || "{}");
                             if (!offDb[targetXuid]) offDb[targetXuid] = [];
@@ -2876,10 +3004,10 @@ function sendPMStatusMenuForOffline(admin, targetXuid, pData) {
                                 senderXuid: pl2.xuid,
                                 amount: amt,
                                 time: tm,
-                                note: "管理员资金操作"
+                                note: tr(pl2, "pm.off.money.note")
                             });
                             offlineDb.write(JSON.stringify(offDb, null, 4));
-                            pl2.tell(PREFIX + "§a执行成功！由于使用记分板经济，款项操作已存入离线队列，将在目标下次上线时自动生效。");
+                            pl2.tell(PREFIX + tr(pl2, "pm.off.money.success_sb"));
                         }
                         csvLog("OfflineMoneyAdmin", pl2.realName, `Adjusted offline money for ${pData.name} by ${amt}`);
                     }
@@ -2912,6 +3040,84 @@ ll.export((xuid, name, ip, clientId) => {
     let pureIp = getPureIp(ip); 
     return checkLocalBan(xuid, name, pureIp, clientId).banned;
 }, "UEssential", "isBanned");
+
+ll.export((queryStr) => {
+    let pDbCfg = config.get("playerDatabase");
+    if (!pDbCfg || !pDbCfg.enabled) return null;
+    if (typeof queryStr !== "string") return null;
+    let minLen = pDbCfg.queryMinLength || 3;
+    if (queryStr.length < minLen) return null;
+    
+    let keys = pdbKV.listKey();
+    let matches = [];
+    let lowerQ = queryStr.toLowerCase();
+    for(let k of keys) {
+        let raw = pdbKV.get(k);
+        if(raw) {
+            let d = JSON.parse(raw);
+            if (d.name.toLowerCase().includes(lowerQ) || (d.historyname && d.historyname.some(n => n.toLowerCase().includes(lowerQ)))) {
+                matches.push({ xuid: k, name: d.name, onlineTime: d.OnlineTime || 0 });
+            }
+        }
+    }
+    return matches;
+}, "UEssential", "queryPlayers");
+
+ll.export((targetXuid, targetName, amount, note, senderIdentity) => {
+    if (!targetXuid || typeof amount !== "number" || isNaN(amount) || amount === 0) return false;
+    note = note || "";
+    senderIdentity = senderIdentity || "System";
+    
+    let targetPlayer = mc.getPlayer(targetXuid);
+    if (targetPlayer) {
+        if (amount > 0) {
+            if (Eco.add(targetPlayer, amount)) {
+                targetPlayer.tell(PREFIX + tr(targetPlayer, "api.eco.add.online", { amount: amount, sender: senderIdentity, note: note || tr(targetPlayer, "general.none") }));
+                csvLog("ApiEcoAdd", senderIdentity, `Added ${amount} to ${targetPlayer.realName} (Note: ${note})`);
+                return true;
+            }
+        } else {
+            let absAmt = Math.abs(amount);
+            if (Eco.reduce(targetPlayer, absAmt)) {
+                targetPlayer.tell(PREFIX + tr(targetPlayer, "api.eco.reduce.online", { amount: absAmt, sender: senderIdentity, note: note || tr(targetPlayer, "general.none") }));
+                csvLog("ApiEcoReduce", senderIdentity, `Reduced ${absAmt} from ${targetPlayer.realName} (Note: ${note})`);
+                return true;
+            }
+        }
+        return false;
+    } else {
+        targetName = targetName || targetXuid;
+        let ecoType = config.get("economy").type;
+        if (ecoType === "llmoney") {
+            if (amount > 0) {
+                if (money.add(targetXuid, amount)) {
+                    csvLog("ApiEcoAddOfflineLL", senderIdentity, `Added ${amount} to ${targetName} (Note: ${note})`);
+                    return true;
+                }
+            } else {
+                let absAmt = Math.abs(amount);
+                if (money.reduce(targetXuid, absAmt)) {
+                    csvLog("ApiEcoReduceOfflineLL", senderIdentity, `Reduced ${absAmt} from ${targetName} (Note: ${note})`);
+                    return true;
+                }
+            }
+            return false;
+        } else {
+            let offDb = JSON.parse(offlineDb.read() || "{}");
+            if (!offDb[targetXuid]) offDb[targetXuid] = [];
+            offDb[targetXuid].push({
+                senderName: senderIdentity,
+                senderXuid: "API",
+                amount: amount,
+                time: system.getTimeStr(),
+                note: note
+            });
+            offlineDb.write(JSON.stringify(offDb, null, 4));
+            csvLog("ApiEcoOfflineQueue", senderIdentity, `Queued ${amount} for ${targetName} (Note: ${note})`);
+            return true;
+        }
+    }
+}, "UEssential", "transferMoneyApi");
 
 logger.setTitle("UEssential");
 logger.info("UEssential " + VERSION.join(".") + " 加载成功！作者：wuw111。BUG反馈或功能建议欢迎加入反馈群：1097933637。本插件为免费插件，如果您是花钱购买的，请立刻投诉商家并且要求退款。");
