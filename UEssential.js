@@ -1,18 +1,18 @@
 /*-----------------------------------------------------------------------
-UEssential 基础插件
-Copyright (c) 2024-2026 wuw111. All rights reserved.
+UEssential 基础插件 
+Copyright (c) 2024-2026 wuw111. All rights reserved. 
 [授权声明]
 本项目基于 CASAL v1.0 协议授权。官方发布渠道仅限 GitHub、KLPBBS、MineBBS，禁止未经许可的转载。
 运行环境：本插件仅限服务端运行，严禁将本体代码或逻辑分发至客户端（如JS源码内容等）。
-允许二次开发，但在公网服务器运行修改版时，必须公开完整源码并沿用 CASAL 协议。
-商业：允许商业服务器部署使用。但【严禁】直接售卖插件、将其加入付费整合包，或在商业服务器内将插件内功能设为“付费解锁”。
+允许二次开发，但在公网服务器运行修改版时，必须公开完整源码并沿用
+CASAL 协议。 商业：允许商业服务器部署使用。但【严禁】直接售卖插件、将其加入付费整合包，或在商业服务器内将插件内功能设为“付费解锁”。
 详细条款、例外情况及授权定义请参阅项目根目录下的 LICENSE 文件。
 温馨提示：本插件永久免费。若您为下载插件文件或为了解锁其内部功能而付费，说明您已被骗，请立即举报。
 项目地址：https://github.com/wuw111/UEssential
 -----------------------------------------------------------------------*/
 
 const PLUGIN_NAME = "UEssential";
-const VERSION = [1, 2, 1];
+const VERSION = [1, 2, 2];
 const PREFIX = "§b§l[UEssential]§r ";
 const DIR_PATH = "plugins/" + PLUGIN_NAME;
 const LANG_PATH = DIR_PATH + "/lang";
@@ -34,12 +34,12 @@ const DEFAULT_CONFIG = {
         conditions: { enableLimits: true, targetMinMoney: 10000, senderMinMoney: 20000, sbName: "" }
     },
     tpr: {
-        enabled: true, cooldownSeconds: 30, maxAttempts: 5, loadDelayMs: 1500,
+        enabled: true, cooldownSeconds: 30, maxAttempts: 10, loadDelayMs: 2000,
         costFormula: "50 * Math.pow(1.05, count)",
         dimensions: {
             "0": { enabled: true, rangeX: [-10000, 10000], rangeZ: [-10000, 10000], maxY: 300 },
-            "1": { enabled: false, rangeX: [-10000, 10000], rangeZ: [-10000, 10000], maxY: 121 },
-            "2": { enabled: false, rangeX: [-10000, 10000], rangeZ: [-10000, 10000], maxY: 250 }
+            "1": { enabled: false, rangeX:[-10000, 10000], rangeZ: [-10000, 10000], maxY: 121 },
+            "2": { enabled: false, rangeX:[-10000, 10000], rangeZ: [-10000, 10000], maxY: 250 }
         }
     },
     home: {
@@ -52,8 +52,8 @@ const DEFAULT_CONFIG = {
     suicide: { enabled: true, costFormula: "5 * Math.pow(1.001, count)" },
     back: { enabled: true, maxDeathRecords: 5, costFormula: "10 * Math.pow(1.001, count) * Math.pow(index, 0.5)" },
     notice: { enabled: true, content: "§l§e欢迎来到服务器！§r\n这里是基础生存服务器，请和谐游戏。\n输入 §a/notice§r 可以再次查看此公告。" },
-    motd: { enabled: false, intervalSeconds: 5, list: ["§b欢迎来到服务器", "§a当前在线: {online}", "§e当前TPS: {tps}"] },
-    customCommands: { enabled: true, superAdmins: ["9999999999999999"] },
+    motd: { enabled: false, intervalSeconds: 5, list:["§b欢迎来到服务器", "§a当前在线: {online}", "§e当前TPS: {tps}"] },
+    customCommands: { enabled: true, superAdmins:["9999999999999999"] },
     playerManage: { enabled: true },
     playerDatabase: { enabled: true, autoBackup: true, backupIntervalDays: 1, queryMinLength: 3 }
 };
@@ -143,6 +143,7 @@ const defaultLangData = {
         "tpr.dim_disabled": "当前维度不允许使用随机传送。",
         "tpr.cooldown": "随机传送冷却中，还需等待 {left} 秒。",
         "tpr.nomoney": "余额不足以支付随机传送费 (需 {cost} 金币)。",
+        "tpr.already_searching": "您正在进行随机传送，请耐心等待寻找安全点完成！",
         "tpr.searching": "正在寻找安全着陆点... (第 {attempt}/{max} 次尝试)",
         "tpr.success": "随机传送成功！已抵达 {x}, {y}, {z}。扣除费用：{cost} 金币。",
         "tpr.failed": "未能找到安全的随机传送点，已将您传回原处并全额退款。",
@@ -261,7 +262,7 @@ const defaultLangData = {
         "home.pub.remove.title": "下架公开家园",
         "home.pub.remove.desc": "注意：下架为一次性操作，剩余时间和费用概不退还！\n请选择你要下架的家园：",
         "home.pub.remove.none": "你没有任何正在公开的家园。",
-        "home.pub.remove.success": "成功下架公开家园 [{name}]。",
+        "home.pub.remove.success": "成功下架公开家园[{name}]。",
         "home.pub.list.title": "公开家园列表",
         "home.pub.list.desc": "选择一个公开家园进行传送：",
         "home.pub.list.none": "当前没有任何公开的家园。",
@@ -435,7 +436,7 @@ const warpDb = new JsonConfigFile(DIR_PATH + "/warps.json", "{}");
 const deathDb = new JsonConfigFile(DIR_PATH + "/DeathPort.json", "{}");
 const homeDb = new JsonConfigFile(DIR_PATH + "/homes.json", "{}");
 const pubHomeDb = new JsonConfigFile(DIR_PATH + "/pubhomes.json", "{}");
-const banDb = new JsonConfigFile(DIR_PATH + "/bans.json", JSON.stringify({ list: [] }));
+const banDb = new JsonConfigFile(DIR_PATH + "/bans.json", JSON.stringify({ list:[] }));
 
 const cusCmdDb = new JsonConfigFile(DIR_PATH + "/cuscmds.json", JSON.stringify({
     list: {
@@ -476,7 +477,7 @@ if (File.exists(oldPdbPath)) {
 const regDb = new JsonConfigFile(DIR_PATH + "/regplayer.json", JSON.stringify({ total: 0, records: {} }));
 const offlineDb = new JsonConfigFile(DIR_PATH + "/offline_transfers.json", "{}");
 
-let csvLogQueue = [];
+let csvLogQueue =[];
 
 function csvLog(event, playerStr, dataStr) {
     let tm = system.getTimeObj();
@@ -499,6 +500,7 @@ let currentTick = 0;
 let lastOnlineTimeCalcTimestamp = Date.now();
 let tpaQueue = {}; 
 let tprCooldowns = {};
+let activeTprPlayers = {};
 
 const TPS_HISTORY_SIZE = 12000;
 let tickTimestamps = new Array(TPS_HISTORY_SIZE);
@@ -642,7 +644,7 @@ const Eco = {
 function checkWordFilter(text) {
     let wfConfig = config.get("wordFilter");
     if (!wfConfig || !wfConfig.enabled) return true;
-    let words = wfConfig.words || [];
+    let words = wfConfig.words ||[];
     let lowerText = text.toLowerCase();
     for (let word of words) {
         if (lowerText.includes(word.toLowerCase())) return false; 
@@ -762,7 +764,7 @@ mc.listen("onTick", () => {
 mc.listen("onPlayerDie", (player, source) => {
     if (player.isSimulatedPlayer() || !config.get("back").enabled) return;
     let pos = player.pos;
-    let records = deathDb.get(player.xuid) || [];
+    let records = deathDb.get(player.xuid) ||[];
     records.unshift({ x: pos.x, y: pos.y, z: pos.z, dimid: pos.dimid, time: system.getTimeStr() });
     
     let max = config.get("back").maxDeathRecords;
@@ -832,16 +834,16 @@ mc.listen("onJoin", (player) => {
             isNew = true;
             pData = {
                 name: realName,
-                historyname: [],
+                historyname:[],
                 IPs: [],
-                clientIDs: [],
+                clientIDs:[],
                 OnlineTime: 0,
                 lastOnlineTime: Date.now()
             };
         } else {
             if (!pData.historyname) pData.historyname = [];
-            if (!pData.IPs) pData.IPs = [];
-            if (!pData.clientIDs) pData.clientIDs = [];
+            if (!pData.IPs) pData.IPs =[];
+            if (!pData.clientIDs) pData.clientIDs =[];
             if (pData.OnlineTime == null) pData.OnlineTime = 0;
             pData.lastOnlineTime = Date.now();
             
@@ -912,6 +914,7 @@ mc.listen("onJoin", (player) => {
 });
 
 mc.listen("onLeft", (player) => {
+    if (activeTprPlayers[player.xuid]) delete activeTprPlayers[player.xuid];
     if (player.isSimulatedPlayer() || !config.get("playerDatabase").enabled) return;
     let raw = pdbKV.get(player.xuid);
     if (raw) {
@@ -958,6 +961,11 @@ function registerTprCommands() {
 }
 
 function processTpr(player) {
+    if (activeTprPlayers[player.xuid]) {
+        sendMsg(player, "tpr.already_searching");
+        return;
+    }
+
     let cfg = config.get("tpr");
     if (!cfg.enabled) { sendMsg(player, "tpr.disabled"); return; }
     
@@ -981,6 +989,11 @@ function processTpr(player) {
     tprCooldowns[player.xuid] = now;
     Util.addCount("tprCounts", player.xuid);
 
+    activeTprPlayers[player.xuid] = true;
+    let maxTotalTicks = Math.ceil((cfg.maxAttempts * cfg.loadDelayMs) / 1000 * 20) + 200;
+    player.addEffect(27, maxTotalTicks, 1, false); 
+    player.addEffect(11, maxTotalTicks, 5, false);
+
     startTprSearch(player, cost, dimCfg, 0, player.pos, cfg);
 }
 
@@ -988,7 +1001,7 @@ function isSafeBodySpace(block) {
     if (!block || typeof block.type !== 'string') return false;
     if (block.isAir) return true;
     let t = block.type;
-    const passables = ["tallgrass", "double_plant", "yellow_flower", "red_flower", "snow_layer", "brown_mushroom", "red_mushroom", "deadbush", "fern", "vine", "waterlily", "torch", "sign", "lantern"];
+    const passables =["tallgrass", "double_plant", "yellow_flower", "red_flower", "snow_layer", "brown_mushroom", "red_mushroom", "deadbush", "fern", "vine", "waterlily", "torch", "sign", "lantern"];
     for (let p of passables) {
         if (t.includes(p)) return true;
     }
@@ -998,7 +1011,7 @@ function isSafeBodySpace(block) {
 function isDangerousSurface(block) {
     if (!block || typeof block.type !== 'string') return true;
     let t = block.type;
-    const dangers = ["lava", "water", "fire", "magma", "powder_snow", "cactus", "sweet_berry_bush", "air", "void", "bedrock"];
+    const dangers =["lava", "water", "fire", "magma", "powder_snow", "cactus", "sweet_berry_bush", "air", "void", "bedrock"];
     for (let d of dangers) {
         if (t.includes(d)) return true;
     }
@@ -1007,6 +1020,9 @@ function isDangerousSurface(block) {
 
 function startTprSearch(player, cost, dimCfg, attempts, originalPos, cfg) {
     if (attempts >= cfg.maxAttempts) {
+        delete activeTprPlayers[player.xuid];
+        player.removeEffect(27);
+        player.removeEffect(11);
         player.teleport(originalPos.x, originalPos.y, originalPos.z, originalPos.dimid);
         Eco.add(player, cost);
         
@@ -1035,9 +1051,6 @@ function startTprSearch(player, cost, dimCfg, attempts, originalPos, cfg) {
 
     let maxY = dimCfg.maxY;
     let targetDim = originalPos.dimid;
-
-    let delayTicks = Math.floor(cfg.loadDelayMs / 1000 * 20);
-    player.addEffect(27, delayTicks + 60, 1, false);
     
     player.teleport(rx, maxY, rz, targetDim);
     player.refreshChunks();
@@ -1045,7 +1058,10 @@ function startTprSearch(player, cost, dimCfg, attempts, originalPos, cfg) {
 
     setTimeout(() => {
         let p = mc.getPlayer(player.xuid);
-        if (!p) return;
+        if (!p) {
+            delete activeTprPlayers[player.xuid];
+            return;
+        }
 
         let found = false;
         let safeY = maxY;
@@ -1069,7 +1085,9 @@ function startTprSearch(player, cost, dimCfg, attempts, originalPos, cfg) {
         }
 
         if (found) {
+            delete activeTprPlayers[p.xuid];
             p.addEffect(27, 20 * 10, 1, false); 
+            p.addEffect(11, 20 * 10, 5, false); 
             p.teleport(rx, safeY, rz, targetDim);
             sendMsg(p, "tpr.success", { x: rx, y: safeY, z: rz, cost: cost });
             csvLog("TPR", p.realName, `TPR success to ${rx}, ${safeY}, ${rz}`);
@@ -1216,7 +1234,7 @@ function mergeBans(bans) {
 }
 
 function checkLocalBan(xuid, name, ip, clientId) {
-    let bans = banDb.get("list") || [];
+    let bans = banDb.get("list") ||[];
     let isBanned = false;
     let matchedBan = null;
     let now = Date.now();
@@ -1256,14 +1274,14 @@ function checkLocalBan(xuid, name, ip, clientId) {
 }
 
 function addLocalBan(info, reason, durationDays) {
-    let bans = banDb.get("list") || [];
+    let bans = banDb.get("list") ||[];
     let expire = durationDays ? Date.now() + durationDays * 86400000 : null;
     let newBan = {
         id: system.randomGuid(),
-        xuids: Array.isArray(info.xuid) ? info.xuid : (info.xuid ? [info.xuid] : []),
-        names: Array.isArray(info.name) ? info.name : (info.name ? [info.name] : []),
-        ips: Array.isArray(info.ip) ? info.ip : (info.ip ? [info.ip] : []),
-        clientIds: Array.isArray(info.clientId) ? info.clientId : (info.clientId ? [info.clientId] : []),
+        xuids: Array.isArray(info.xuid) ? info.xuid : (info.xuid ?[info.xuid] :[]),
+        names: Array.isArray(info.name) ? info.name : (info.name ? [info.name] :[]),
+        ips: Array.isArray(info.ip) ? info.ip : (info.ip ? [info.ip] :[]),
+        clientIds: Array.isArray(info.clientId) ? info.clientId : (info.clientId ? [info.clientId] :[]),
         reason: reason || tr(null, "ban.reason.default"),
         expireTime: expire
     };
@@ -1358,7 +1376,7 @@ function sendBanForm(admin) {
     let names = onlinePlayers.map(p => p.realName);
     
     let fm = mc.newCustomForm().setTitle(tr(admin, "ban.form.title"));
-    fm.addDropdown(tr(admin, "ban.form.dropdown"), [tr(admin, "ban.form.dropdown.empty"), ...names], 0);
+    fm.addDropdown(tr(admin, "ban.form.dropdown"),[tr(admin, "ban.form.dropdown.empty"), ...names], 0);
     fm.addInput(tr(admin, "ban.form.input_name"), "Name or XUID", "");
     fm.addInput(tr(admin, "ban.form.input_days"), tr(admin, "ban.form.days_ph"), "");
     fm.addInput(tr(admin, "ban.form.input_reason"), tr(admin, "ban.form.reason_ph"), tr(admin, "ban.reason.default"));
@@ -1387,7 +1405,7 @@ function sendBanForm(admin) {
 }
 
 function processBan(admin, targetStr, targetPlayer, days, reason) {
-    let info = { xuid: [], name: [], ip: [], clientId: [] };
+    let info = { xuid: [], name: [], ip: [], clientId:[] };
     
     if (!targetPlayer) {
         let tp = mc.getPlayer(targetStr);
@@ -1448,7 +1466,7 @@ function processBan(admin, targetStr, targetPlayer, days, reason) {
 }
 
 function sendUnbanForm(admin) {
-    let bans = banDb.get("list") || [];
+    let bans = banDb.get("list") ||[];
     if (bans.length === 0) {
         sendMsg(admin, "unban.none");
         return;
@@ -1473,7 +1491,7 @@ function sendUnbanForm(admin) {
 }
 
 function processUnbanStr(admin, targetStr) {
-    let bans = banDb.get("list") || [];
+    let bans = banDb.get("list") ||[];
     let found = -1;
     for (let i = 0; i < bans.length; i++) {
         if (bans[i].xuids.includes(targetStr) || bans[i].names.includes(targetStr)) {
@@ -1538,7 +1556,7 @@ function savePubHomes(obj) {
 
 function registerHomeCommands() {
     let cmdHome = mc.newCommand("home", "家园系统 / Home System", PermType.Any);
-    cmdHome.setEnum("HomeAction", ["add", "delete", "go", "publish"]);
+    cmdHome.setEnum("HomeAction",["add", "delete", "go", "publish"]);
     cmdHome.optional("action", ParamType.Enum, "HomeAction", "HomeAction", 1);
     cmdHome.optional("name", ParamType.String);
     cmdHome.overload([]);
@@ -1714,7 +1732,7 @@ function sendHomePublishCreateForm(pl) {
     if (playerPubCount >= cfg.maxPerPlayer) { sendMsg(pl, "home.pub.full_player"); return; }
 
     let homes = homeDb.get(pl.xuid) || {};
-    let availableHomes = [];
+    let availableHomes =[];
     for (let name of Object.keys(homes)) {
         if (!pubHomes[pl.xuid + "_" + name]) availableHomes.push(name);
     }
@@ -1860,7 +1878,7 @@ function registerBackCommands() {
     cmdBack.setCallback((cmd, origin, out, results) => {
         if (!origin.player || origin.player.isSimulatedPlayer()) return;
         let pl = origin.player;
-        let records = deathDb.get(pl.xuid) || [];
+        let records = deathDb.get(pl.xuid) ||[];
         if (records.length === 0) { sendMsg(pl, "back.none"); return; }
         
         if (results.action === "gui") sendBackForm(pl, records);
@@ -1951,7 +1969,7 @@ function sendWarpSetMenu(player) {
         .addButton(tr(player, "warp.manage.edit"))
         .addButton(tr(player, "warp.manage.delete"));
     player.sendForm(fm, (pl, id) => {
-        if (id == null) return; 
+        if (id == null) return;
         switch (id) {
             case 0: addWarpForm(pl, true); break;
             case 1: addWarpForm(pl, false); break;
@@ -1966,12 +1984,12 @@ function addWarpForm(player, isCurrent) {
     fm.addInput(tr(player, "warp.add.name"), "", "");
     if (!isCurrent) {
         fm.addInput("X", "", "0").addInput("Y", "", "100").addInput("Z", "", "0");
-        fm.addDropdown(tr(player, "warp.add.dim"), ["主世界", "下界", "末地"], 0);
+        fm.addDropdown(tr(player, "warp.add.dim"),["主世界", "下界", "末地"], 0);
     }
     fm.addInput(tr(player, "warp.add.icon"), "textures/... (留空为无)", "");
 
     player.sendForm(fm, (pl, data) => {
-        if (data == null) return; 
+        if (data == null) return;
         let name = (data[0] || "").trim();
         if (name === "") return;
         let warps = getWarpsObj();
@@ -2015,7 +2033,7 @@ function editWarpSelectForm(player) {
     names.forEach(n => fm.addButton(n));
 
     player.sendForm(fm, (pl, id) => {
-        if (id == null) return; 
+        if (id == null) return;
         let tName = names[id], wData = warps[tName];
         let cfm = mc.newCustomForm().setTitle(tr(player, "warp.edit.title"))
             .addInput(tr(player, "warp.add.name"), "", tName)
@@ -2024,7 +2042,7 @@ function editWarpSelectForm(player) {
             .addInput(tr(player, "warp.add.icon"), "textures/... (留空为无)", wData.icon || "");
 
         pl.sendForm(cfm, (pl2, data) => {
-            if (data == null) return; 
+            if (data == null) return;
             let newName = (data[0] || "").trim(), x = parseFloat(data[1]), y = parseFloat(data[2]), z = parseFloat(data[3]);
             if (newName === "" || isNaN(x) || isNaN(y) || isNaN(z)) { sendMsg(pl2, "warp.invalid"); return; }
             if (newName !== tName) warpDb.delete(tName);
@@ -2043,7 +2061,7 @@ function sendWarpForm(player) {
     names.forEach(n => { let i = warps[n].icon; (i && i !== "") ? fm.addButton(n, i) : fm.addButton(n); });
     
     player.sendForm(fm, (pl, id) => {
-        if (id == null) return; 
+        if (id == null) return;
         processWarpGo(pl, names[id]);
     });
 }
@@ -2070,7 +2088,7 @@ function registerTpaCommands() {
             for (let i = queue.length - 1; i >= 0; i--) {
                 if (queue[i].senderXuid === pl.xuid) {
                     let req = queue.splice(i, 1)[0];
-                    canceled++; 
+                    canceled++;
                     refundTotal += Math.floor(req.cost * rate);
                 }
             }
@@ -2129,7 +2147,7 @@ function sendTpaForm(player) {
         .setTitle(tr(player, "tpa.form.title"))
         .addLabel(tr(player, "tpa.form.desc"))  
         .addDropdown(tr(player, "tpa.form.target"), pList.map(i => i.name), 0) 
-        .addDropdown(tr(player, "tpa.form.type"), [tr(player, "tpa.form.type.tpa"), tr(player, "tpa.form.type.tpahere")], 0);
+        .addDropdown(tr(player, "tpa.form.type"),[tr(player, "tpa.form.type.tpa"), tr(player, "tpa.form.type.tpahere")], 0);
 
     player.sendForm(fm, (pl, data) => {
         if (data == null) return;
@@ -2175,7 +2193,7 @@ function sendTpaConfirmForm(sender, targetXuid, targetName, type, cost) {
             type: type, cost: cost, expireTick: currentTick + (config.get("tpa").timeoutSeconds * 20)
         };
 
-        if (!tpaQueue[targetXuid]) tpaQueue[targetXuid] = [];
+        if (!tpaQueue[targetXuid]) tpaQueue[targetXuid] =[];
         tpaQueue[targetXuid].push(req);
         sendMsg(pl, "tpa.sent", { cost: cost });
         csvLog("TPA", pl.realName, `Sent TPA request to ${targetName}`);
@@ -2303,7 +2321,7 @@ function sendTransferForm(player) {
             if (searchName.length < minLen) { pl.tell(PREFIX + tr(pl, "eco.transfer.search_tooshort", { min: minLen })); return; }
             
             let keys = pdbKV.listKey();
-            let matches = [];
+            let matches =[];
             let lowerQ = searchName.toLowerCase();
             for(let k of keys) {
                 let raw = pdbKV.get(k);
@@ -2375,7 +2393,7 @@ function sendTransferConfirmForm(player, targetXuid, targetName, amount, totalCo
                     }
                 } else {
                     let offDb = JSON.parse(offlineDb.read() || "{}");
-                    if (!offDb[targetXuid]) offDb[targetXuid] = [];
+                    if (!offDb[targetXuid]) offDb[targetXuid] =[];
                     let tm = system.getTimeStr();
                     offDb[targetXuid].push({
                         senderName: pl.realName,
@@ -2401,9 +2419,9 @@ function registerLangCommands() {
     cmdLang.overload([]);
     cmdLang.setCallback((cmd, origin) => {
         if (!origin.player || origin.player.isSimulatedPlayer()) return;
-        let files = File.getFilesList(LANG_PATH) || [], langs = files.map(f => f.replace(".json", ""));
+        let files = File.getFilesList(LANG_PATH) ||[], langs = files.map(f => f.replace(".json", ""));
         if (!langs.includes("zh_CN")) langs.push("zh_CN");
-        langs = [...new Set(langs)];
+        langs =[...new Set(langs)];
         
         let fm = mc.newSimpleForm().setTitle(tr(origin.player, "lang.title")).setContent(tr(origin.player, "lang.desc"));
         langs.forEach(l => fm.addButton(l));
@@ -2503,13 +2521,13 @@ function sendCusCmdCreateForm(player) {
         .addInput(tr(player, "cuscmd.form.desc"), tr(player, "cuscmd.form.desc_ph"), tr(player, "cuscmd.form.desc_def"))
         .addInput(tr(player, "cuscmd.form.alias"), tr(player, "cuscmd.form.alias_ph"))
         .addInput(tr(player, "cuscmd.form.target"), tr(player, "cuscmd.form.target_ph"))
-        .addDropdown(tr(player, "cuscmd.form.executor"), [tr(player, "cuscmd.form.exec_player"), tr(player, "cuscmd.form.exec_console")], 0)
+        .addDropdown(tr(player, "cuscmd.form.executor"),[tr(player, "cuscmd.form.exec_player"), tr(player, "cuscmd.form.exec_console")], 0)
         .addSwitch(tr(player, "cuscmd.form.append"), false);
 
     player.sendForm(fm, (pl, data) => {
         if (data == null) return;
         let cmdName = (data[0] || "").trim();
-        let desc = (data[1] || "").trim(); 
+        let desc = (data[1] || "").trim();
         let alias = (data[2] || "").trim();
         let targetCmd = (data[3] || "").trim();
         let runAsConsole = (data[4] === 1);
@@ -2776,7 +2794,7 @@ function sendPMStatusMenu(admin, targetPlayer) {
     let fm = mc.newSimpleForm().setTitle(tr(admin, "pm.status.title", { name: targetPlayer.realName })).setContent(info);
     
     let inv = targetPlayer.getInventory();
-    let slotMap = [];
+    let slotMap =[];
     if(inv) {
         let items = inv.getAllItems();
         for(let i = 0; i < items.length; i++) {
@@ -2843,7 +2861,7 @@ function sendPMStatusMenu(admin, targetPlayer) {
 
 function registerPlayerDatabaseCommand() {
     let cmd = mc.newCommand("playerdatabase", "Player Database System", PermType.GameMasters);
-    cmd.setEnum("PDBAction", ["refresh", "export", "query"]);
+    cmd.setEnum("PDBAction",["refresh", "export", "query"]);
     cmd.optional("action", ParamType.Enum, "PDBAction", "PDBAction", 1);
     cmd.optional("param", ParamType.String);
     cmd.overload([]);
@@ -2889,7 +2907,7 @@ function registerPlayerDatabaseCommand() {
                 return;
             }
             let keys = pdbKV.listKey();
-            let matches = [];
+            let matches =[];
             let lowerQ = queryStr.toLowerCase();
             for(let k of keys) {
                 let raw = pdbKV.get(k);
@@ -2960,12 +2978,12 @@ function sendPdbQueryMatches(admin, matches, queryStr) {
 
 function sendPMStatusMenuForOffline(admin, targetXuid, pData) {
     let fm = mc.newSimpleForm().setTitle(tr(admin, "pm.off.title", { name: pData.name }));
-    let ips = (pData.IPs || []).join(", ");
-    let cids = (pData.clientIDs || []).join(", ");
+    let ips = (pData.IPs ||[]).join(", ");
+    let cids = (pData.clientIDs ||[]).join(", ");
     let lastOn = pData.lastOnlineTime ? new Date(pData.lastOnlineTime).toLocaleString() : tr(admin, "general.unknown");
     let onlineTime = (pData.OnlineTime || 0).toFixed(2);
     
-    fm.setContent(tr(admin, "pm.off.info", { name: pData.name, history: (pData.historyname || []).join(", "), xuid: targetXuid, ips: ips, cids: cids, time: onlineTime, last: lastOn }));
+    fm.setContent(tr(admin, "pm.off.info", { name: pData.name, history: (pData.historyname ||[]).join(", "), xuid: targetXuid, ips: ips, cids: cids, time: onlineTime, last: lastOn }));
     fm.addButton(tr(admin, "pm.off.btn.ban"));
     fm.addButton(tr(admin, "pm.off.btn.money"));
     fm.addButton(tr(admin, "general.back"));
@@ -2997,7 +3015,7 @@ function sendPMStatusMenuForOffline(admin, targetXuid, pData) {
                             pl2.tell(PREFIX + tr(pl2, "pm.off.money.success_ll"));
                         } else {
                             let offDb = JSON.parse(offlineDb.read() || "{}");
-                            if (!offDb[targetXuid]) offDb[targetXuid] = [];
+                            if (!offDb[targetXuid]) offDb[targetXuid] =[];
                             let tm = system.getTimeStr();
                             offDb[targetXuid].push({
                                 senderName: pl2.realName,
@@ -3049,7 +3067,7 @@ ll.export((queryStr) => {
     if (queryStr.length < minLen) return null;
     
     let keys = pdbKV.listKey();
-    let matches = [];
+    let matches =[];
     let lowerQ = queryStr.toLowerCase();
     for(let k of keys) {
         let raw = pdbKV.get(k);
@@ -3120,4 +3138,4 @@ ll.export((targetXuid, targetName, amount, note, senderIdentity) => {
 }, "UEssential", "transferMoneyApi");
 
 logger.setTitle("UEssential");
-logger.info("UEssential " + VERSION.join(".") + " 加载成功！作者：wuw111。BUG反馈或功能建议欢迎加入反馈群：1097933637。本插件为免费插件，如果您是花钱购买的，请立刻投诉商家并且要求退款。");
+logger.info("UEssential " + VERSION.join(".") + " 加载成功！作者：wuw111。BUG反馈或功能建议请加入反馈群：1097933637。本插件为免费插件，如果您是花钱购买的，请投诉商家并且要求退款。");
