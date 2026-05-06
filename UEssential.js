@@ -1,18 +1,19 @@
 /*-----------------------------------------------------------------------
 UEssential 基础插件 
 Copyright (c) 2024-2026 wuw111. All rights reserved. 
+
 [授权声明]
 本项目基于 CASAL v1.0 协议授权。官方发布渠道仅限 GitHub、KLPBBS、MineBBS，禁止未经许可的转载。
 运行环境：本插件仅限服务端运行，严禁将本体代码或逻辑分发至客户端（如JS源码内容等）。
-允许二次开发，但在公网服务器运行修改版时，必须公开完整源码并沿用
-CASAL 协议。 商业：允许商业服务器部署使用。但【严禁】直接售卖插件、将其加入付费整合包，或在商业服务器内将插件内功能设为“付费解锁”。
+允许二次开发，但在公网服务器运行修改版时，必须公开完整源码并沿用CASAL 协议。 
+商业：允许商业服务器部署使用。但【严禁】直接售卖插件、将其加入付费整合包，或在商业服务器内将插件内功能设为“付费解锁”。
 详细条款、例外情况及授权定义请参阅项目根目录下的 LICENSE 文件。
 温馨提示：本插件永久免费。若您为下载插件文件或为了解锁其内部功能而付费，说明您已被骗，请立即举报。
+
 项目地址：https://github.com/wuw111/UEssential
 -----------------------------------------------------------------------*/
-
 const PLUGIN_NAME = "UEssential";
-const VERSION = [1, 2, 2];
+const VERSION =[1, 2, 3];
 const PREFIX = "§b§l[UEssential]§r ";
 const DIR_PATH = "plugins/" + PLUGIN_NAME;
 const LANG_PATH = DIR_PATH + "/lang";
@@ -37,8 +38,8 @@ const DEFAULT_CONFIG = {
         enabled: true, cooldownSeconds: 30, maxAttempts: 10, loadDelayMs: 2000,
         costFormula: "50 * Math.pow(1.05, count)",
         dimensions: {
-            "0": { enabled: true, rangeX: [-10000, 10000], rangeZ: [-10000, 10000], maxY: 300 },
-            "1": { enabled: false, rangeX:[-10000, 10000], rangeZ: [-10000, 10000], maxY: 121 },
+            "0": { enabled: true, rangeX: [-10000, 10000], rangeZ:[-10000, 10000], maxY: 300 },
+            "1": { enabled: false, rangeX: [-10000, 10000], rangeZ: [-10000, 10000], maxY: 121 },
             "2": { enabled: false, rangeX:[-10000, 10000], rangeZ: [-10000, 10000], maxY: 250 }
         }
     },
@@ -139,7 +140,7 @@ const defaultLangData = {
         "unban.not_found": "未找到该玩家的封禁记录。",
         "unban.console_err": "控制台必须提供目标参数。",
 
-        "tpr.disabled": "随机传送功能目前已关闭。",
+        "tpr.disabled": "随机传送功能目前关闭。",
         "tpr.dim_disabled": "当前维度不允许使用随机传送。",
         "tpr.cooldown": "随机传送冷却中，还需等待 {left} 秒。",
         "tpr.nomoney": "余额不足以支付随机传送费 (需 {cost} 金币)。",
@@ -206,6 +207,7 @@ const defaultLangData = {
         "eco.transfer.fail": "系统错误：扣款失败！",
         "eco.offline.receive": "§a您收到了一笔离线转账/拨款！\n§e金额: §a{amount}\n§e发件人: §b{sender}\n§e时间: §7{time}\n§e留言: §f{note}",
         "eco.offline.deduct": "§c系统在您离线期间扣除了款项！\n§e金额: §c{amount}\n§e操作人: §b{sender}\n§e时间: §7{time}\n§e留言: §f{note}",
+        "eco.offline.notify": "§a经济账户变动通知\n§e操作方: §b{sender}\n§e时间: §7{time}\n§e留言: §f{note}",
         "eco.transfer.offline_search_hint": "--- 使用下方输入框搜索离线玩家 ---",
         "eco.transfer.search_input": "或输入要搜索的离线玩家名称 (留空则使用上方下拉列表)",
         "eco.transfer.search_ph": "最少3个字符",
@@ -258,11 +260,11 @@ const defaultLangData = {
         "home.pub.invalid_days": "输入的公开天数无效。",
         "home.pub.failed": "发布失败：可能由于容量限制或该家园已发布。",
         "home.pub.nomoney": "余额不足以支付发布费用 (需 {cost} 金币)。",
-        "home.pub.success": "成功发布家园 [{name}] {days} 天！扣除费用：{cost} 金币。",
+        "home.pub.success": "成功发布家园[{name}] {days} 天！扣除费用：{cost} 金币。",
         "home.pub.remove.title": "下架公开家园",
         "home.pub.remove.desc": "注意：下架为一次性操作，剩余时间和费用概不退还！\n请选择你要下架的家园：",
         "home.pub.remove.none": "你没有任何正在公开的家园。",
-        "home.pub.remove.success": "成功下架公开家园[{name}]。",
+        "home.pub.remove.success": "成功下架公开家园 [{name}]。",
         "home.pub.list.title": "公开家园列表",
         "home.pub.list.desc": "选择一个公开家园进行传送：",
         "home.pub.list.none": "当前没有任何公开的家园。",
@@ -380,7 +382,7 @@ const defaultLangData = {
         "pm.status.info": "名称: {name}\nXUID: {xuid}\nUUID: {uuid}\nIP: {ip}\nClientID: {cid}\nOS: {os}\n累积在线时长: {time} 分钟\n\n--- 背包物品 (点击审查NBT) ---",
         "pm.status.item": "数量: {count} | 格子编号: {slot}",
         "pm.status.no_nbt": "该物品无 NBT 数据附着",
-        "pm.status.nbt_title": "物品 NBT 审查 [插槽 {slot}]",
+        "pm.status.nbt_title": "物品 NBT 审查[插槽 {slot}]",
         "pm.status.nbt_info": "物品: {name}\n数量: {count}\n类型ID: {type}\n\n==== NBT 结构 ====\n{nbt}",
         "pm.status.btn.back": "返回上级菜单",
         "pm.status.btn.copy": "复制该物品到我的背包",
@@ -404,7 +406,7 @@ const defaultLangData = {
 
         "pdb.refresh.success": "§a数据库已计算刷新完毕。当前KVDB内记录总数: {kv} | 注册记录数: {reg}",
         "pdb.export.success": "§a操作成功！数据库全量数据已手动导出至文件: {path}",
-        "pdb.query.usage": "§c指令使用错误：请输入要搜索的玩家名称片段！用法: /playerdatabase query [名字]",
+        "pdb.query.usage": "§c指令使用错误：请输入要搜索的玩家名称片段！用法: /playerdatabase query[名字]",
         "pdb.query.short": "§c搜索字段太短！为防止误操作和服务器卡顿，请至少输入 {min} 个字符。",
         "pdb.query.none": "§c检索完毕：未在数据库中找到任何匹配该名称的玩家记录。",
         "pdb.info.title": "玩家数据库信息",
@@ -535,7 +537,7 @@ const Formulas = {
         const tprF = safeFormula(config.get("tpr").costFormula, ["count"], DEFAULT_CONFIG.tpr.costFormula, "tpr");
         const tpaF = safeFormula(config.get("tpa").costFormula, ["count"], DEFAULT_CONFIG.tpa.costFormula, "tpa");
         const warpF = safeFormula(config.get("warp").costFormula, ["count"], DEFAULT_CONFIG.warp.costFormula, "warp");
-        const suicideF = safeFormula(config.get("suicide").costFormula, ["count"], DEFAULT_CONFIG.suicide.costFormula, "suicide");
+        const suicideF = safeFormula(config.get("suicide").costFormula,["count"], DEFAULT_CONFIG.suicide.costFormula, "suicide");
         const backF = safeFormula(config.get("back").costFormula, ["count", "index"], DEFAULT_CONFIG.back.costFormula, "back");
         const tpsF = safeFormula(config.get("tps").costFormula, ["count"], DEFAULT_CONFIG.tps.costFormula, "tps");
         
@@ -890,6 +892,8 @@ mc.listen("onJoin", (player) => {
                         let current = Eco.get(p);
                         Eco.set(p, current + r.amount);
                         p.tell(PREFIX + tr(p, "eco.offline.deduct", { amount: absAmt, sender: r.senderName, time: r.time, note: r.note || tr(p, "general.none") }));
+                    } else if (r.amount === 0) {
+                        p.tell(PREFIX + tr(p, "eco.offline.notify", { sender: r.senderName, time: r.time, note: r.note || tr(p, "general.none") }));
                     }
                 }
                 delete offTransfers[player.xuid];
@@ -1278,8 +1282,8 @@ function addLocalBan(info, reason, durationDays) {
     let expire = durationDays ? Date.now() + durationDays * 86400000 : null;
     let newBan = {
         id: system.randomGuid(),
-        xuids: Array.isArray(info.xuid) ? info.xuid : (info.xuid ?[info.xuid] :[]),
-        names: Array.isArray(info.name) ? info.name : (info.name ? [info.name] :[]),
+        xuids: Array.isArray(info.xuid) ? info.xuid : (info.xuid ? [info.xuid] :[]),
+        names: Array.isArray(info.name) ? info.name : (info.name ?[info.name] :[]),
         ips: Array.isArray(info.ip) ? info.ip : (info.ip ? [info.ip] :[]),
         clientIds: Array.isArray(info.clientId) ? info.clientId : (info.clientId ? [info.clientId] :[]),
         reason: reason || tr(null, "ban.reason.default"),
@@ -1405,7 +1409,7 @@ function sendBanForm(admin) {
 }
 
 function processBan(admin, targetStr, targetPlayer, days, reason) {
-    let info = { xuid: [], name: [], ip: [], clientId:[] };
+    let info = { xuid: [], name: [], ip:[], clientId:[] };
     
     if (!targetPlayer) {
         let tp = mc.getPlayer(targetStr);
@@ -1556,7 +1560,7 @@ function savePubHomes(obj) {
 
 function registerHomeCommands() {
     let cmdHome = mc.newCommand("home", "家园系统 / Home System", PermType.Any);
-    cmdHome.setEnum("HomeAction",["add", "delete", "go", "publish"]);
+    cmdHome.setEnum("HomeAction", ["add", "delete", "go", "publish"]);
     cmdHome.optional("action", ParamType.Enum, "HomeAction", "HomeAction", 1);
     cmdHome.optional("name", ParamType.String);
     cmdHome.overload([]);
@@ -1776,7 +1780,7 @@ function sendHomePublishCreateForm(pl) {
 
 function sendHomePublishRemoveForm(pl) {
     let pubHomes = getPubHomes();
-    let myPubs = [];
+    let myPubs =[];
     for (let k in pubHomes) { if (pubHomes[k].publisherXuid === pl.xuid) myPubs.push(pubHomes[k]); }
 
     if (myPubs.length === 0) { sendMsg(pl, "home.pub.remove.none"); return; }
@@ -1969,7 +1973,7 @@ function sendWarpSetMenu(player) {
         .addButton(tr(player, "warp.manage.edit"))
         .addButton(tr(player, "warp.manage.delete"));
     player.sendForm(fm, (pl, id) => {
-        if (id == null) return;
+        if (id == null) return; 
         switch (id) {
             case 0: addWarpForm(pl, true); break;
             case 1: addWarpForm(pl, false); break;
@@ -1984,12 +1988,12 @@ function addWarpForm(player, isCurrent) {
     fm.addInput(tr(player, "warp.add.name"), "", "");
     if (!isCurrent) {
         fm.addInput("X", "", "0").addInput("Y", "", "100").addInput("Z", "", "0");
-        fm.addDropdown(tr(player, "warp.add.dim"),["主世界", "下界", "末地"], 0);
+        fm.addDropdown(tr(player, "warp.add.dim"), ["主世界", "下界", "末地"], 0);
     }
     fm.addInput(tr(player, "warp.add.icon"), "textures/... (留空为无)", "");
 
     player.sendForm(fm, (pl, data) => {
-        if (data == null) return;
+        if (data == null) return; 
         let name = (data[0] || "").trim();
         if (name === "") return;
         let warps = getWarpsObj();
@@ -2033,16 +2037,16 @@ function editWarpSelectForm(player) {
     names.forEach(n => fm.addButton(n));
 
     player.sendForm(fm, (pl, id) => {
-        if (id == null) return;
+        if (id == null) return; 
         let tName = names[id], wData = warps[tName];
         let cfm = mc.newCustomForm().setTitle(tr(player, "warp.edit.title"))
             .addInput(tr(player, "warp.add.name"), "", tName)
             .addInput("X", "", wData.x.toString()).addInput("Y", "", wData.y.toString()).addInput("Z", "", wData.z.toString())
-            .addDropdown(tr(player, "warp.add.dim"), ["主世界", "下界", "末地"], wData.dimid)
+            .addDropdown(tr(player, "warp.add.dim"),["主世界", "下界", "末地"], wData.dimid)
             .addInput(tr(player, "warp.add.icon"), "textures/... (留空为无)", wData.icon || "");
 
         pl.sendForm(cfm, (pl2, data) => {
-            if (data == null) return;
+            if (data == null) return; 
             let newName = (data[0] || "").trim(), x = parseFloat(data[1]), y = parseFloat(data[2]), z = parseFloat(data[3]);
             if (newName === "" || isNaN(x) || isNaN(y) || isNaN(z)) { sendMsg(pl2, "warp.invalid"); return; }
             if (newName !== tName) warpDb.delete(tName);
@@ -2061,7 +2065,7 @@ function sendWarpForm(player) {
     names.forEach(n => { let i = warps[n].icon; (i && i !== "") ? fm.addButton(n, i) : fm.addButton(n); });
     
     player.sendForm(fm, (pl, id) => {
-        if (id == null) return;
+        if (id == null) return; 
         processWarpGo(pl, names[id]);
     });
 }
@@ -2088,7 +2092,7 @@ function registerTpaCommands() {
             for (let i = queue.length - 1; i >= 0; i--) {
                 if (queue[i].senderXuid === pl.xuid) {
                     let req = queue.splice(i, 1)[0];
-                    canceled++;
+                    canceled++; 
                     refundTotal += Math.floor(req.cost * rate);
                 }
             }
@@ -2421,7 +2425,7 @@ function registerLangCommands() {
         if (!origin.player || origin.player.isSimulatedPlayer()) return;
         let files = File.getFilesList(LANG_PATH) ||[], langs = files.map(f => f.replace(".json", ""));
         if (!langs.includes("zh_CN")) langs.push("zh_CN");
-        langs =[...new Set(langs)];
+        langs = [...new Set(langs)];
         
         let fm = mc.newSimpleForm().setTitle(tr(origin.player, "lang.title")).setContent(tr(origin.player, "lang.desc"));
         langs.forEach(l => fm.addButton(l));
@@ -2527,7 +2531,7 @@ function sendCusCmdCreateForm(player) {
     player.sendForm(fm, (pl, data) => {
         if (data == null) return;
         let cmdName = (data[0] || "").trim();
-        let desc = (data[1] || "").trim();
+        let desc = (data[1] || "").trim(); 
         let alias = (data[2] || "").trim();
         let targetCmd = (data[3] || "").trim();
         let runAsConsole = (data[4] === 1);
@@ -2617,7 +2621,7 @@ function sendCusCmdDeleteForm(player) {
 
 function registerPlayerManageCommands() {
     let cmdPM = mc.newCommand("playermanage", "Player Management System", PermType.GameMasters);
-    cmdPM.setEnum("PMAction", ["look", "talkas", "cmdas", "money", "status", "crash"]);
+    cmdPM.setEnum("PMAction",["look", "talkas", "cmdas", "money", "status", "crash"]);
     cmdPM.optional("target", ParamType.Player);
     cmdPM.optional("action", ParamType.Enum, "PMAction", "PMAction", 1);
     cmdPM.optional("content", ParamType.RawText);
@@ -3035,6 +3039,19 @@ function sendPMStatusMenuForOffline(admin, targetXuid, pData) {
     });
 }
 
+function pushOfflineNotify(xuid, senderIdentity, msg) {
+    let offDb = JSON.parse(offlineDb.read() || "{}");
+    if (!offDb[xuid]) offDb[xuid] =[];
+    offDb[xuid].push({
+        senderName: senderIdentity,
+        senderXuid: "API",
+        amount: 0,
+        time: system.getTimeStr(),
+        note: msg
+    });
+    offlineDb.write(JSON.stringify(offDb, null, 4));
+}
+
 ll.export(() => {
     if (!config.get("tps") || !config.get("tps").enabled) return null;
     return parseFloat(getAvgTps(60));
@@ -3047,7 +3064,7 @@ ll.export(() => {
 
 ll.export((xuid) => {
     if (!config.get("playerDatabase") || !config.get("playerDatabase").enabled) return null;
-    if (!xuid) return null;
+    if (!xuid || typeof xuid !== "string") return null;
     let raw = pdbKV.get(xuid);
     let pData = raw ? JSON.parse(raw) : null;
     return pData ? (pData.OnlineTime || 0) : 0;
@@ -3081,58 +3098,120 @@ ll.export((queryStr) => {
     return matches;
 }, "UEssential", "queryPlayers");
 
-ll.export((targetXuid, targetName, amount, note, senderIdentity) => {
+ll.export((xuid, field) => {
+    if (!config.get("playerDatabase") || !config.get("playerDatabase").enabled) return null;
+    if (!xuid || typeof xuid !== "string") return null;
+    
+    let raw = pdbKV.get(xuid);
+    let parsed = raw ? JSON.parse(raw) : null;
+    
+    let regDataStr = regDb.read();
+    let regData = regDataStr ? JSON.parse(regDataStr) : null;
+    let regInfo = regData && regData.records ? regData.records[xuid] : null;
+
+    let result = {
+        name: parsed ? parsed.name : null,
+        historyname: parsed && parsed.historyname ? parsed.historyname :[],
+        registerDate: regInfo ? (regInfo.date + " " + regInfo.time) : null,
+        lastOnlineTime: parsed && parsed.lastOnlineTime ? new Date(parsed.lastOnlineTime).toLocaleString() : null,
+        IPs: parsed && parsed.IPs ? parsed.IPs :[],
+        clientIDs: parsed && parsed.clientIDs ? parsed.clientIDs :[],
+        onlineTime: parsed && parsed.OnlineTime ? parsed.OnlineTime : 0
+    };
+
+    if (field && typeof field === "string") {
+        return result[field] !== undefined ? result[field] : null;
+    }
+    return result;
+}, "UEssential", "getPlayerData");
+
+ll.export((targetXuid, targetName, amount, note, senderIdentity, strict) => {
     if (!targetXuid || typeof amount !== "number" || isNaN(amount) || amount === 0) return false;
     note = note || "";
     senderIdentity = senderIdentity || "System";
     
+    let changeStr = amount > 0 ? "+" + amount : amount.toString();
+    note = note + "[Amount Change:" + changeStr + "]";
+    
+    let ecoType = config.get("economy").type;
+    let sbName = config.get("economy").sbName;
     let targetPlayer = mc.getPlayer(targetXuid);
+    
     if (targetPlayer) {
+        let success = false;
         if (amount > 0) {
-            if (Eco.add(targetPlayer, amount)) {
-                targetPlayer.tell(PREFIX + tr(targetPlayer, "api.eco.add.online", { amount: amount, sender: senderIdentity, note: note || tr(targetPlayer, "general.none") }));
-                csvLog("ApiEcoAdd", senderIdentity, `Added ${amount} to ${targetPlayer.realName} (Note: ${note})`);
-                return true;
-            }
+            if (Eco.add(targetPlayer, amount)) success = true;
         } else {
             let absAmt = Math.abs(amount);
-            if (Eco.reduce(targetPlayer, absAmt)) {
-                targetPlayer.tell(PREFIX + tr(targetPlayer, "api.eco.reduce.online", { amount: absAmt, sender: senderIdentity, note: note || tr(targetPlayer, "general.none") }));
-                csvLog("ApiEcoReduce", senderIdentity, `Reduced ${absAmt} from ${targetPlayer.realName} (Note: ${note})`);
-                return true;
+            if (Eco.reduce(targetPlayer, absAmt)) success = true;
+        }
+        
+        if (success) {
+            if (amount > 0) {
+                targetPlayer.tell(PREFIX + tr(targetPlayer, "api.eco.add.online", { amount: amount, sender: senderIdentity, note: note }));
+                csvLog("ApiEcoAdd", senderIdentity, `Added ${amount} to ${targetPlayer.realName} (Note: ${note})`);
+            } else {
+                targetPlayer.tell(PREFIX + tr(targetPlayer, "api.eco.reduce.online", { amount: Math.abs(amount), sender: senderIdentity, note: note }));
+                csvLog("ApiEcoReduce", senderIdentity, `Reduced ${Math.abs(amount)} from ${targetPlayer.realName} (Note: ${note})`);
             }
+            pushOfflineNotify(targetXuid, senderIdentity, note);
+            return true;
         }
         return false;
     } else {
         targetName = targetName || targetXuid;
-        let ecoType = config.get("economy").type;
+        
         if (ecoType === "llmoney") {
+            let success = false;
             if (amount > 0) {
-                if (money.add(targetXuid, amount)) {
-                    csvLog("ApiEcoAddOfflineLL", senderIdentity, `Added ${amount} to ${targetName} (Note: ${note})`);
-                    return true;
-                }
+                if (money.add(targetXuid, amount)) success = true;
             } else {
-                let absAmt = Math.abs(amount);
-                if (money.reduce(targetXuid, absAmt)) {
-                    csvLog("ApiEcoReduceOfflineLL", senderIdentity, `Reduced ${absAmt} from ${targetName} (Note: ${note})`);
-                    return true;
+                if (money.reduce(targetXuid, Math.abs(amount))) success = true;
+            }
+            
+            if (success) {
+                if (amount > 0) {
+                    csvLog("ApiEcoAddOfflineLL", senderIdentity, `Added ${amount} to ${targetName} (Note: ${note})`);
+                } else {
+                    csvLog("ApiEcoReduceOfflineLL", senderIdentity, `Reduced ${Math.abs(amount)} from ${targetName} (Note: ${note})`);
                 }
+                pushOfflineNotify(targetXuid, senderIdentity, note);
+                return true;
             }
             return false;
         } else {
-            let offDb = JSON.parse(offlineDb.read() || "{}");
-            if (!offDb[targetXuid]) offDb[targetXuid] = [];
-            offDb[targetXuid].push({
-                senderName: senderIdentity,
-                senderXuid: "API",
-                amount: amount,
-                time: system.getTimeStr(),
-                note: note
-            });
-            offlineDb.write(JSON.stringify(offDb, null, 4));
-            csvLog("ApiEcoOfflineQueue", senderIdentity, `Queued ${amount} for ${targetName} (Note: ${note})`);
-            return true;
+            if (strict) {
+                let idInfo = data.fromXuid(targetXuid);
+                if (!idInfo || !idInfo.uuid) return false;
+                let uuid = idInfo.uuid;
+                
+                let currentScore = mc.getPlayerScore(uuid, sbName);
+                if (currentScore == null || isNaN(currentScore)) currentScore = 0;
+                
+                if (amount < 0 && currentScore + amount < 0) {
+                    return false;
+                }
+                
+                if (mc.setPlayerScore(uuid, sbName, currentScore + amount)) {
+                    csvLog("ApiEcoStrictOfflineSB", senderIdentity, `Adjusted ${amount} for offline ${targetName} via strict SB (Note: ${note})`);
+                    pushOfflineNotify(targetXuid, senderIdentity, note);
+                    return true;
+                }
+                return false;
+            } else {
+                let offDb = JSON.parse(offlineDb.read() || "{}");
+                if (!offDb[targetXuid]) offDb[targetXuid] =[];
+                offDb[targetXuid].push({
+                    senderName: senderIdentity,
+                    senderXuid: "API",
+                    amount: amount,
+                    time: system.getTimeStr(),
+                    note: note
+                });
+                offlineDb.write(JSON.stringify(offDb, null, 4));
+                csvLog("ApiEcoOfflineQueue", senderIdentity, `Queued ${amount} for ${targetName} (Note: ${note})`);
+                return true;
+            }
         }
     }
 }, "UEssential", "transferMoneyApi");
