@@ -1,19 +1,19 @@
 /*-----------------------------------------------------------------------
-UEssential 基础插件 
-Copyright (c) 2024-2026 wuw111. All rights reserved. 
+ UEssential 基础插件
+ Copyright (c) 2024-2026 wuw111. All rights reserved.
 
-[授权声明]
-本项目基于 CASAL v1.0 协议授权。官方发布渠道仅限 GitHub、KLPBBS、MineBBS，禁止未经许可的转载。
-运行环境：本插件仅限服务端运行，严禁将本体代码或逻辑分发至客户端（如JS源码内容等）。
-允许二次开发，但在公网服务器运行修改版时，必须公开完整源码并沿用CASAL 协议。 
-商业：允许商业服务器部署使用。但【严禁】直接售卖插件、将其加入付费整合包，或在商业服务器内将插件内功能设为“付费解锁”。
-详细条款、例外情况及授权定义请参阅项目根目录下的 LICENSE 文件。
-温馨提示：本插件永久免费。若您为下载插件文件或为了解锁其内部功能而付费，说明您已被骗，请立即举报。
+ [授权声明]
+ 本项目基于 CASAL v1.0 协议授权。官方发布渠道仅限 GitHub、KLPBBS、MineBBS，禁止未经许可的转载。
+ 运行环境：本插件仅限服务端运行，严禁将本体代码或逻辑分发至客户端（如JS源码内容等）。
+ 允许二次开发，但在公网服务器运行修改版时，必须公开完整源码并沿用CASAL 协议。
+ 商业：允许商业服务器部署使用。但【严禁】直接售卖插件、将其加入付费整合包，或在商业服务器内将插件内功能设为“付费解锁”。
+ 详细条款、例外情况及授权定义请参阅项目根目录下的 LICENSE 文件。
+ 温馨提示：本插件永久免费。若您为下载插件文件或为了解锁其内部功能而付费，说明您已被骗，请立即举报。
 
-项目地址：https://github.com/wuw111/UEssential
------------------------------------------------------------------------*/
+ 项目地址：https://github.com/wuw111/UEssential
+ -----------------------------------------------------------------------*/
 const PLUGIN_NAME = "UEssential";
-const VERSION =[1, 2, 3];
+const VERSION =[1, 2, 4];
 const PREFIX = "§b§l[UEssential]§r ";
 const DIR_PATH = "plugins/" + PLUGIN_NAME;
 const LANG_PATH = DIR_PATH + "/lang";
@@ -38,7 +38,7 @@ const DEFAULT_CONFIG = {
         enabled: true, cooldownSeconds: 30, maxAttempts: 10, loadDelayMs: 2000,
         costFormula: "50 * Math.pow(1.05, count)",
         dimensions: {
-            "0": { enabled: true, rangeX: [-10000, 10000], rangeZ:[-10000, 10000], maxY: 300 },
+            "0": { enabled: true, rangeX: [-10000, 10000], rangeZ: [-10000, 10000], maxY: 300 },
             "1": { enabled: false, rangeX: [-10000, 10000], rangeZ: [-10000, 10000], maxY: 121 },
             "2": { enabled: false, rangeX:[-10000, 10000], rangeZ: [-10000, 10000], maxY: 250 }
         }
@@ -406,7 +406,7 @@ const defaultLangData = {
 
         "pdb.refresh.success": "§a数据库已计算刷新完毕。当前KVDB内记录总数: {kv} | 注册记录数: {reg}",
         "pdb.export.success": "§a操作成功！数据库全量数据已手动导出至文件: {path}",
-        "pdb.query.usage": "§c指令使用错误：请输入要搜索的玩家名称片段！用法: /playerdatabase query[名字]",
+        "pdb.query.usage": "§c指令使用错误：请输入要搜索的玩家名称片段！用法: /playerdatabase query [名字]",
         "pdb.query.short": "§c搜索字段太短！为防止误操作和服务器卡顿，请至少输入 {min} 个字符。",
         "pdb.query.none": "§c检索完毕：未在数据库中找到任何匹配该名称的玩家记录。",
         "pdb.info.title": "玩家数据库信息",
@@ -1101,6 +1101,7 @@ function startTprSearch(player, cost, dimCfg, attempts, originalPos, cfg) {
     }, cfg.loadDelayMs);
 }
 
+
 function getAvgTps(expectedSeconds) {
     if (tickTotalCount < 2) return (20.00).toFixed(2);
     let targetIntervals = expectedSeconds * 20;
@@ -1283,7 +1284,7 @@ function addLocalBan(info, reason, durationDays) {
     let newBan = {
         id: system.randomGuid(),
         xuids: Array.isArray(info.xuid) ? info.xuid : (info.xuid ? [info.xuid] :[]),
-        names: Array.isArray(info.name) ? info.name : (info.name ?[info.name] :[]),
+        names: Array.isArray(info.name) ? info.name : (info.name ? [info.name] :[]),
         ips: Array.isArray(info.ip) ? info.ip : (info.ip ? [info.ip] :[]),
         clientIds: Array.isArray(info.clientId) ? info.clientId : (info.clientId ? [info.clientId] :[]),
         reason: reason || tr(null, "ban.reason.default"),
@@ -1380,7 +1381,7 @@ function sendBanForm(admin) {
     let names = onlinePlayers.map(p => p.realName);
     
     let fm = mc.newCustomForm().setTitle(tr(admin, "ban.form.title"));
-    fm.addDropdown(tr(admin, "ban.form.dropdown"),[tr(admin, "ban.form.dropdown.empty"), ...names], 0);
+    fm.addDropdown(tr(admin, "ban.form.dropdown"), [tr(admin, "ban.form.dropdown.empty"), ...names], 0);
     fm.addInput(tr(admin, "ban.form.input_name"), "Name or XUID", "");
     fm.addInput(tr(admin, "ban.form.input_days"), tr(admin, "ban.form.days_ph"), "");
     fm.addInput(tr(admin, "ban.form.input_reason"), tr(admin, "ban.form.reason_ph"), tr(admin, "ban.reason.default"));
@@ -1409,7 +1410,7 @@ function sendBanForm(admin) {
 }
 
 function processBan(admin, targetStr, targetPlayer, days, reason) {
-    let info = { xuid: [], name: [], ip:[], clientId:[] };
+    let info = { xuid: [], name: [], ip: [], clientId:[] };
     
     if (!targetPlayer) {
         let tp = mc.getPlayer(targetStr);
@@ -1560,8 +1561,8 @@ function savePubHomes(obj) {
 
 function registerHomeCommands() {
     let cmdHome = mc.newCommand("home", "家园系统 / Home System", PermType.Any);
-    cmdHome.setEnum("HomeAction", ["add", "delete", "go", "publish"]);
-    cmdHome.optional("action", ParamType.Enum, "HomeAction", "HomeAction", 1);
+    cmdHome.setEnum("UE_HomeAction", ["add", "delete", "go", "publish"]);
+    cmdHome.optional("action", ParamType.Enum, "UE_HomeAction", "UE_HomeAction", 1);
     cmdHome.optional("name", ParamType.String);
     cmdHome.overload([]);
     cmdHome.overload(["action"]);
@@ -1875,8 +1876,8 @@ function registerSuicideCommands() {
 
 function registerBackCommands() {
     let cmdBack = mc.newCommand("back", "返回死亡点 / Back to death point", PermType.Any);
-    cmdBack.setEnum("GuiEnum", ["gui"]);
-    cmdBack.optional("action", ParamType.Enum, "GuiEnum", "GuiEnum", 1);
+    cmdBack.setEnum("UE_GuiEnum", ["gui"]);
+    cmdBack.optional("action", ParamType.Enum, "UE_GuiEnum", "UE_GuiEnum", 1);
     cmdBack.overload([]);
     cmdBack.overload(["action"]);
     cmdBack.setCallback((cmd, origin, out, results) => {
@@ -1929,8 +1930,8 @@ function registerWarpCommands() {
     cmdWarpSet.setup();
 
     let cmdWarp = mc.newCommand("warp", "地标传送 / Warp Teleport", PermType.Any);
-    cmdWarp.setEnum("WarpAction", ["go"]);
-    cmdWarp.optional("action", ParamType.Enum, "WarpAction", "WarpAction", 1);
+    cmdWarp.setEnum("UE_WarpAction", ["go"]);
+    cmdWarp.optional("action", ParamType.Enum, "UE_WarpAction", "UE_WarpAction", 1);
     cmdWarp.optional("name", ParamType.String);
     cmdWarp.overload([]);
     cmdWarp.overload(["action"]);
@@ -2197,7 +2198,7 @@ function sendTpaConfirmForm(sender, targetXuid, targetName, type, cost) {
             type: type, cost: cost, expireTick: currentTick + (config.get("tpa").timeoutSeconds * 20)
         };
 
-        if (!tpaQueue[targetXuid]) tpaQueue[targetXuid] =[];
+        if (!tpaQueue[targetXuid]) tpaQueue[targetXuid] = [];
         tpaQueue[targetXuid].push(req);
         sendMsg(pl, "tpa.sent", { cost: cost });
         csvLog("TPA", pl.realName, `Sent TPA request to ${targetName}`);
@@ -2441,6 +2442,7 @@ function registerLangCommands() {
     cmdLang.setup();
 }
 
+
 function setupDynamicCmd(cmdName, cmdData) {
     let dynCmd = mc.newCommand(cmdName, cmdData.desc || "自定义映射命令", PermType.Any);
     if (cmdData.alias && cmdData.alias !== "") {
@@ -2621,9 +2623,9 @@ function sendCusCmdDeleteForm(player) {
 
 function registerPlayerManageCommands() {
     let cmdPM = mc.newCommand("playermanage", "Player Management System", PermType.GameMasters);
-    cmdPM.setEnum("PMAction",["look", "talkas", "cmdas", "money", "status", "crash"]);
+    cmdPM.setEnum("UE_PMAction",["look", "talkas", "cmdas", "money", "status", "crash"]);
     cmdPM.optional("target", ParamType.Player);
-    cmdPM.optional("action", ParamType.Enum, "PMAction", "PMAction", 1);
+    cmdPM.optional("action", ParamType.Enum, "UE_PMAction", "UE_PMAction", 1);
     cmdPM.optional("content", ParamType.RawText);
     cmdPM.overload([]);
     cmdPM.overload(["target"]);
@@ -2865,8 +2867,8 @@ function sendPMStatusMenu(admin, targetPlayer) {
 
 function registerPlayerDatabaseCommand() {
     let cmd = mc.newCommand("playerdatabase", "Player Database System", PermType.GameMasters);
-    cmd.setEnum("PDBAction",["refresh", "export", "query"]);
-    cmd.optional("action", ParamType.Enum, "PDBAction", "PDBAction", 1);
+    cmd.setEnum("UE_PDBAction",["refresh", "export", "query"]);
+    cmd.optional("action", ParamType.Enum, "UE_PDBAction", "UE_PDBAction", 1);
     cmd.optional("param", ParamType.String);
     cmd.overload([]);
     cmd.overload(["action"]);
@@ -3019,7 +3021,7 @@ function sendPMStatusMenuForOffline(admin, targetXuid, pData) {
                             pl2.tell(PREFIX + tr(pl2, "pm.off.money.success_ll"));
                         } else {
                             let offDb = JSON.parse(offlineDb.read() || "{}");
-                            if (!offDb[targetXuid]) offDb[targetXuid] =[];
+                            if (!offDb[targetXuid]) offDb[targetXuid] = [];
                             let tm = system.getTimeStr();
                             offDb[targetXuid].push({
                                 senderName: pl2.realName,
@@ -3041,7 +3043,7 @@ function sendPMStatusMenuForOffline(admin, targetXuid, pData) {
 
 function pushOfflineNotify(xuid, senderIdentity, msg) {
     let offDb = JSON.parse(offlineDb.read() || "{}");
-    if (!offDb[xuid]) offDb[xuid] =[];
+    if (!offDb[xuid]) offDb[xuid] = [];
     offDb[xuid].push({
         senderName: senderIdentity,
         senderXuid: "API",
@@ -3131,7 +3133,7 @@ ll.export((targetXuid, targetName, amount, note, senderIdentity, strict) => {
     senderIdentity = senderIdentity || "System";
     
     let changeStr = amount > 0 ? "+" + amount : amount.toString();
-    note = note + "[Amount Change:" + changeStr + "]";
+    note = note + " [Amount Change:" + changeStr + "]";
     
     let ecoType = config.get("economy").type;
     let sbName = config.get("economy").sbName;
