@@ -12,8 +12,9 @@
 
  项目地址：https://github.com/wuw111/UEssential
  -----------------------------------------------------------------------*/
+ 
 const PLUGIN_NAME = "UEssential";
-const VERSION =[1, 2, 4];
+const VERSION =[1, 2, 5];
 const PREFIX = "§b§l[UEssential]§r ";
 const DIR_PATH = "plugins/" + PLUGIN_NAME;
 const LANG_PATH = DIR_PATH + "/lang";
@@ -159,6 +160,8 @@ const defaultLangData = {
         "tpa.form.type.tpa": "传送到该玩家身边 (TPA)",
         "tpa.form.type.tpahere": "把该玩家传送过来 (TPA Here)",
         "tpa.target_offline": "目标玩家已离线。",
+        "tpa.target_not_found": "找不到目标玩家！",
+        "tpa.self": "不能向自己发起 TPA 请求。",
         "tpa.target_disabled": "玩家 {name} 已关闭了 TPA 接收功能。",
         "tpa.limit.target": "请求失败：对方余额未达到接收标准。",
         "tpa.limit.sender": "请求失败：您的余额未达到发起标准。",
@@ -479,6 +482,7 @@ if (File.exists(oldPdbPath)) {
 const regDb = new JsonConfigFile(DIR_PATH + "/regplayer.json", JSON.stringify({ total: 0, records: {} }));
 const offlineDb = new JsonConfigFile(DIR_PATH + "/offline_transfers.json", "{}");
 
+
 let csvLogQueue =[];
 
 function csvLog(event, playerStr, dataStr) {
@@ -509,7 +513,7 @@ let tickTimestamps = new Array(TPS_HISTORY_SIZE);
 let tickIndex = 0;
 let tickTotalCount = 0;
 
-function safeFormula(formulaStr, allowedVars, defaultFormula, configGroup, subKey) {
+function safeFormula(formulaStr, allowedVars, defaultFormula, configGroup, subKey, formulaKey) {
     if (typeof formulaStr !== "string" || formulaStr.trim() === "") return defaultFormula;
     let stripped = formulaStr.replace(/Math\.(pow|sqrt|abs|floor|ceil|min|max|E|PI)/g, "");
     for (let v of allowedVars) {
@@ -521,8 +525,13 @@ function safeFormula(formulaStr, allowedVars, defaultFormula, configGroup, subKe
         logger.warn(`安全沙盒：拦截到注入或无法识别的内容！(归属: ${configGroup}) 将纠正为默认值。`);
         let cfgObj = config.get(configGroup);
         if (cfgObj) {
-            if (subKey && cfgObj[subKey]) cfgObj[subKey].costFormula = defaultFormula;
-            else cfgObj.costFormula = defaultFormula;
+            let key = formulaKey || "costFormula";
+            if (subKey) {
+                if (!cfgObj[subKey] || typeof cfgObj[subKey] !== "object") cfgObj[subKey] = {};
+                cfgObj[subKey][key] = defaultFormula;
+            } else {
+                cfgObj[key] = defaultFormula;
+            }
             config.set(configGroup, cfgObj);
         }
         return defaultFormula;
@@ -541,9 +550,11 @@ const Formulas = {
         const backF = safeFormula(config.get("back").costFormula, ["count", "index"], DEFAULT_CONFIG.back.costFormula, "back");
         const tpsF = safeFormula(config.get("tps").costFormula, ["count"], DEFAULT_CONFIG.tps.costFormula, "tps");
         
-        const homeAddF = safeFormula(config.get("home").addCostFormula, ["count"], DEFAULT_CONFIG.home.addCostFormula, "home");
-        const homeGoF = safeFormula(config.get("home").goCostFormula, ["count"], DEFAULT_CONFIG.home.goCostFormula, "home");
-        const homePubF = safeFormula(config.get("home").publish.costFormula, ["days"], DEFAULT_CONFIG.home.publish.costFormula, "home", "publish");
+        const homeCfg = config.get("home") || {};
+        const homePublishCfg = (homeCfg.publish && typeof homeCfg.publish === "object") ? homeCfg.publish : {};
+        const homeAddF = safeFormula(homeCfg.addCostFormula, ["count"], DEFAULT_CONFIG.home.addCostFormula, "home", null, "addCostFormula");
+        const homeGoF = safeFormula(homeCfg.goCostFormula, ["count"], DEFAULT_CONFIG.home.goCostFormula, "home", null, "goCostFormula");
+        const homePubF = safeFormula(homePublishCfg.costFormula, ["days"], DEFAULT_CONFIG.home.publish.costFormula, "home", "publish", "costFormula");
 
         this.tprCost = this._buildFunc(["count"], tprF);
         this.tpaCost = this._buildFunc(["count"], tpaF);
@@ -2073,12 +2084,24 @@ function sendWarpForm(player) {
 
 function registerTpaCommands() {
     let cmdTpa = mc.newCommand("tpa", "打开 TPA 传送菜单", PermType.Any);
+    cmdTpa.setEnum("UE_TpaAction", ["to", "here"]);
+    cmdTpa.optional("action", ParamType.Enum, "UE_TpaAction", "UE_TpaAction", 1);
+    cmdTpa.optional("target", ParamType.Player);
     cmdTpa.overload([]);
-    cmdTpa.setCallback((cmd, origin) => {
+    cmdTpa.overload(["action", "target"]);
+    cmdTpa.setCallback((cmd, origin, out, results) => {
         if (!origin.player || origin.player.isSimulatedPlayer()) return;
-        if (!Util.acceptsTpa(origin.player.xuid)) { sendMsg(origin.player, "tpa.disabled"); return; }
-        if (Util.hasPendingRequest(origin.player.xuid)) { sendMsg(origin.player, "tpa.pending"); return; }
-        sendTpaForm(origin.player);
+        let pl = origin.player;
+        if (!Util.acceptsTpa(pl.xuid)) { sendMsg(pl, "tpa.disabled"); return; }
+        if (Util.hasPendingRequest(pl.xuid)) { sendMsg(pl, "tpa.pending"); return; }
+
+        if (results.action && results.target) {
+            if (!results.target.length) { sendMsg(pl, "tpa.target_not_found"); return; }
+            let type = results.action === "to" ? 0 : 1;
+            prepareTpaRequest(pl, results.target[0], type);
+            return;
+        }
+        sendTpaForm(pl);
     });
     cmdTpa.setup();
 
@@ -2143,6 +2166,26 @@ function registerTpaCommands() {
     cmdTpaSet.setup();
 }
 
+function prepareTpaRequest(pl, targetPlayer, type) {
+    if (!targetPlayer) { sendMsg(pl, "tpa.target_offline"); return; }
+    if (targetPlayer.xuid === pl.xuid) { sendMsg(pl, "tpa.self"); return; }
+    if (!Util.acceptsTpa(targetPlayer.xuid)) { sendMsg(pl, "tpa.target_disabled", { name: targetPlayer.realName }); return; }
+
+    let cond = config.get("tpa").conditions;
+    if (cond.enableLimits) {
+        let targetBal = cond.sbName ? Eco.getSpecific(targetPlayer, cond.sbName) : Eco.get(targetPlayer);
+        let senderBal = cond.sbName ? Eco.getSpecific(pl, cond.sbName) : Eco.get(pl);
+        if (targetBal < cond.targetMinMoney) { sendMsg(pl, "tpa.limit.target"); return; }
+        if (senderBal < cond.senderMinMoney) { sendMsg(pl, "tpa.limit.sender"); return; }
+    }
+
+    let cost = Math.floor(Formulas.tpaCost(Util.getCount("tpaCounts", pl.xuid)));
+    if (isNaN(cost) || cost < 0) cost = 0;
+
+    if (Eco.get(pl) < cost) { sendMsg(pl, "tpa.fee.insufficient", { cost: cost }); return; }
+    sendTpaConfirmForm(pl, targetPlayer.xuid, targetPlayer.realName, type, cost);
+}
+
 function sendTpaForm(player) {
     let onlinePlayers = mc.getOnlinePlayers().filter(p => p.xuid !== player.xuid);
     if (onlinePlayers.length === 0) { sendMsg(player, "tpa.no_players"); return; }
@@ -2156,24 +2199,8 @@ function sendTpaForm(player) {
 
     player.sendForm(fm, (pl, data) => {
         if (data == null) return;
-        let targetInfo = pList[data[1]], type = data[2], targetPlayer = mc.getPlayer(targetInfo.xuid);
-
-        if (!targetPlayer) { sendMsg(pl, "tpa.target_offline"); return; }
-        if (!Util.acceptsTpa(targetPlayer.xuid)) { sendMsg(pl, "tpa.target_disabled", { name: targetPlayer.realName }); return; }
-
-        let cond = config.get("tpa").conditions;
-        if (cond.enableLimits) {
-            let targetBal = cond.sbName ? Eco.getSpecific(targetPlayer, cond.sbName) : Eco.get(targetPlayer);
-            let senderBal = cond.sbName ? Eco.getSpecific(pl, cond.sbName) : Eco.get(pl);
-            if (targetBal < cond.targetMinMoney) { sendMsg(pl, "tpa.limit.target"); return; }
-            if (senderBal < cond.senderMinMoney) { sendMsg(pl, "tpa.limit.sender"); return; }
-        }
-
-        let cost = Math.floor(Formulas.tpaCost(Util.getCount("tpaCounts", pl.xuid)));
-        if (isNaN(cost) || cost < 0) cost = 0;
-
-        if (Eco.get(pl) < cost) { sendMsg(pl, "tpa.fee.insufficient", { cost: cost }); return; }
-        sendTpaConfirmForm(pl, targetInfo.xuid, targetInfo.name, type, cost);
+        let targetInfo = pList[data[1]], type = data[2];
+        prepareTpaRequest(pl, mc.getPlayer(targetInfo.xuid), type);
     });
 }
 
@@ -3041,6 +3068,8 @@ function sendPMStatusMenuForOffline(admin, targetXuid, pData) {
     });
 }
 
+
+
 function pushOfflineNotify(xuid, senderIdentity, msg) {
     let offDb = JSON.parse(offlineDb.read() || "{}");
     if (!offDb[xuid]) offDb[xuid] = [];
@@ -3217,6 +3246,7 @@ ll.export((targetXuid, targetName, amount, note, senderIdentity, strict) => {
         }
     }
 }, "UEssential", "transferMoneyApi");
+
 
 logger.setTitle("UEssential");
 logger.info("UEssential " + VERSION.join(".") + " 加载成功！作者：wuw111。BUG反馈或功能建议请加入反馈群：1097933637。本插件为免费插件，如果您是花钱购买的，请投诉商家并且要求退款。");
