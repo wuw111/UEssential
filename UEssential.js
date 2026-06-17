@@ -12,9 +12,9 @@
 
  项目地址：https://github.com/wuw111/UEssential
  -----------------------------------------------------------------------*/
- 
+
 const PLUGIN_NAME = "UEssential";
-const VERSION =[1, 2, 5];
+const VERSION = [1, 2, 6];
 const PREFIX = "§b§l[UEssential]§r ";
 const DIR_PATH = "plugins/" + PLUGIN_NAME;
 const LANG_PATH = DIR_PATH + "/lang";
@@ -32,7 +32,7 @@ const DEFAULT_CONFIG = {
     ban: { enabled: true, cloudBlackBE: true, cloudUniteBan: false, cloudRecordToLocal: false },
     tpa: {
         enabled: true, timeoutSeconds: 60, refundRate: 0.8,
-        costFormula: "10 * Math.pow(1.001, count)", 
+        costFormula: "10 * Math.pow(1.001, count)",
         conditions: { enableLimits: true, targetMinMoney: 10000, senderMinMoney: 20000, sbName: "" }
     },
     tpr: {
@@ -41,7 +41,7 @@ const DEFAULT_CONFIG = {
         dimensions: {
             "0": { enabled: true, rangeX: [-10000, 10000], rangeZ: [-10000, 10000], maxY: 300 },
             "1": { enabled: false, rangeX: [-10000, 10000], rangeZ: [-10000, 10000], maxY: 121 },
-            "2": { enabled: false, rangeX:[-10000, 10000], rangeZ: [-10000, 10000], maxY: 250 }
+            "2": { enabled: false, rangeX: [-10000, 10000], rangeZ: [-10000, 10000], maxY: 250 }
         }
     },
     home: {
@@ -54,8 +54,8 @@ const DEFAULT_CONFIG = {
     suicide: { enabled: true, costFormula: "5 * Math.pow(1.001, count)" },
     back: { enabled: true, maxDeathRecords: 5, costFormula: "10 * Math.pow(1.001, count) * Math.pow(index, 0.5)" },
     notice: { enabled: true, content: "§l§e欢迎来到服务器！§r\n这里是基础生存服务器，请和谐游戏。\n输入 §a/notice§r 可以再次查看此公告。" },
-    motd: { enabled: false, intervalSeconds: 5, list:["§b欢迎来到服务器", "§a当前在线: {online}", "§e当前TPS: {tps}"] },
-    customCommands: { enabled: true, superAdmins:["9999999999999999"] },
+    motd: { enabled: false, intervalSeconds: 5, list: ["§b欢迎来到服务器", "§a当前在线: {online}", "§e当前TPS: {tps}"] },
+    customCommands: { enabled: true, superAdmins: ["9999999999999999"] },
     playerManage: { enabled: true },
     playerDatabase: { enabled: true, autoBackup: true, backupIntervalDays: 1, queryMinLength: 3 }
 };
@@ -110,7 +110,7 @@ const defaultLangData = {
         "lang.desc": "请选择您的偏好语言：\nPlease select your preferred language:",
         "error.player_only": "仅限玩家执行此命令。",
         "error.deduct": "扣款失败！",
-        
+
         "wordfilter.blocked": "操作失败：内容包含违禁词汇！",
 
         "tps.admin.title": "§l§6=== 服务器 TPS 状态 ===§r\n",
@@ -192,7 +192,7 @@ const defaultLangData = {
         "tpa.set.off": "您的 TPA 功能已关闭。",
         "tpa.canceled": "已取消 {count} 个待处理的 TPA 请求，退还 {refund} 金币。",
         "tpa.cancel.none": "你没有待处理的 TPA 请求。",
-        
+
         "eco.main.title": "§l§6经济系统",
         "eco.main.desc": "您当前的余额为：§a{balance}§r\n请选择您要进行的操作：",
         "eco.main.btn.transfer": "发起转账",
@@ -301,7 +301,7 @@ const defaultLangData = {
 
         "suicide.success": "您已结束了自己的生命。扣除手续费：{cost} 金币",
         "suicide.nomoney": "余额不足以支付自杀手续费 (需 {cost} 金币)",
-        
+
         "back.success": "已返回死亡点。扣除手续费：{cost} 金币",
         "back.nomoney": "余额不足以支付返回手续费 (需 {cost} 金币)",
         "back.none": "尚未找到您的死亡记录。",
@@ -441,7 +441,7 @@ const warpDb = new JsonConfigFile(DIR_PATH + "/warps.json", "{}");
 const deathDb = new JsonConfigFile(DIR_PATH + "/DeathPort.json", "{}");
 const homeDb = new JsonConfigFile(DIR_PATH + "/homes.json", "{}");
 const pubHomeDb = new JsonConfigFile(DIR_PATH + "/pubhomes.json", "{}");
-const banDb = new JsonConfigFile(DIR_PATH + "/bans.json", JSON.stringify({ list:[] }));
+const banDb = new JsonConfigFile(DIR_PATH + "/bans.json", JSON.stringify({ list: [] }));
 
 const cusCmdDb = new JsonConfigFile(DIR_PATH + "/cuscmds.json", JSON.stringify({
     list: {
@@ -474,7 +474,7 @@ if (File.exists(oldPdbPath)) {
             File.delete(oldPdbPath);
             logger.info("已成功将旧版 playerdatabase.json 迁移至新一代 KVDatabase。");
         }
-    } catch(e) {
+    } catch (e) {
         logger.error("旧版玩家数据库迁移失败: " + e);
     }
 }
@@ -483,19 +483,19 @@ const regDb = new JsonConfigFile(DIR_PATH + "/regplayer.json", JSON.stringify({ 
 const offlineDb = new JsonConfigFile(DIR_PATH + "/offline_transfers.json", "{}");
 
 
-let csvLogQueue =[];
+let csvLogQueue = [];
 
 function csvLog(event, playerStr, dataStr) {
     let tm = system.getTimeObj();
-    let today = `${tm.Y}-${String(tm.M).padStart(2,'0')}-${String(tm.D).padStart(2,'0')}`;
-    let time = `${String(tm.h).padStart(2,'0')}:${String(tm.m).padStart(2,'0')}:${String(tm.s).padStart(2,'0')}`;
-    
+    let today = `${tm.Y}-${String(tm.M).padStart(2, '0')}-${String(tm.D).padStart(2, '0')}`;
+    let time = `${String(tm.h).padStart(2, '0')}:${String(tm.m).padStart(2, '0')}:${String(tm.s).padStart(2, '0')}`;
+
     let escape = (str) => {
         if (str == null) return '""';
         str = String(str).replace(/"/g, '""');
         return `"${str}"`;
     };
-    
+
     csvLogQueue.push({
         today: today,
         line: `${escape(time)},${escape(playerStr)},${escape(event)},${escape(dataStr)}`
@@ -504,7 +504,7 @@ function csvLog(event, playerStr, dataStr) {
 
 let currentTick = 0;
 let lastOnlineTimeCalcTimestamp = Date.now();
-let tpaQueue = {}; 
+let tpaQueue = {};
 let tprCooldowns = {};
 let activeTprPlayers = {};
 
@@ -519,8 +519,8 @@ function safeFormula(formulaStr, allowedVars, defaultFormula, configGroup, subKe
     for (let v of allowedVars) {
         stripped = stripped.replace(new RegExp("\\b" + v + "\\b", "g"), "");
     }
-    stripped = stripped.replace(/[\d\s\+\-\*\/\%\(\)\.,]/g, ""); 
-    
+    stripped = stripped.replace(/[\d\s\+\-\*\/\%\(\)\.,]/g, "");
+
     if (stripped.length > 0) {
         logger.warn(`安全沙盒：拦截到注入或无法识别的内容！(归属: ${configGroup}) 将纠正为默认值。`);
         let cfgObj = config.get(configGroup);
@@ -542,14 +542,14 @@ function safeFormula(formulaStr, allowedVars, defaultFormula, configGroup, subKe
 const Formulas = {
     tprCost: null, tpaCost: null, warpCost: null, suicideCost: null, backCost: null,
     homeAddCost: null, homeGoCost: null, homePublishCost: null, tpsCost: null,
-    update: function() {
+    update: function () {
         const tprF = safeFormula(config.get("tpr").costFormula, ["count"], DEFAULT_CONFIG.tpr.costFormula, "tpr");
         const tpaF = safeFormula(config.get("tpa").costFormula, ["count"], DEFAULT_CONFIG.tpa.costFormula, "tpa");
         const warpF = safeFormula(config.get("warp").costFormula, ["count"], DEFAULT_CONFIG.warp.costFormula, "warp");
-        const suicideF = safeFormula(config.get("suicide").costFormula,["count"], DEFAULT_CONFIG.suicide.costFormula, "suicide");
+        const suicideF = safeFormula(config.get("suicide").costFormula, ["count"], DEFAULT_CONFIG.suicide.costFormula, "suicide");
         const backF = safeFormula(config.get("back").costFormula, ["count", "index"], DEFAULT_CONFIG.back.costFormula, "back");
         const tpsF = safeFormula(config.get("tps").costFormula, ["count"], DEFAULT_CONFIG.tps.costFormula, "tps");
-        
+
         const homeCfg = config.get("home") || {};
         const homePublishCfg = (homeCfg.publish && typeof homeCfg.publish === "object") ? homeCfg.publish : {};
         const homeAddF = safeFormula(homeCfg.addCostFormula, ["count"], DEFAULT_CONFIG.home.addCostFormula, "home", null, "addCostFormula");
@@ -562,14 +562,14 @@ const Formulas = {
         this.suicideCost = this._buildFunc(["count"], suicideF);
         this.backCost = this._buildFunc(["count", "index"], backF);
         this.tpsCost = this._buildFunc(["count"], tpsF);
-        
+
         this.homeAddCost = this._buildFunc(["count"], homeAddF);
         this.homeGoCost = this._buildFunc(["count"], homeGoF);
         this.homePublishCost = this._buildFunc(["days"], homePubF);
     },
-    _buildFunc: function(args, formulaStr) {
-        try { return new Function(...args, "return (" + formulaStr + ");"); } 
-        catch (e) { return function() { return 0; }; }
+    _buildFunc: function (args, formulaStr) {
+        try { return new Function(...args, "return (" + formulaStr + ");"); }
+        catch (e) { return function () { return 0; }; }
     }
 };
 Formulas.update();
@@ -592,28 +592,28 @@ function getPureIp(ipStr) {
 }
 
 const Util = {
-    getTodayStr: function() {
+    getTodayStr: function () {
         let tm = system.getTimeObj();
-        return `${tm.Y}-${String(tm.M).padStart(2,'0')}-${String(tm.D).padStart(2,'0')}`;
+        return `${tm.Y}-${String(tm.M).padStart(2, '0')}-${String(tm.D).padStart(2, '0')}`;
     },
-    getCount: function(dbKey, xuid) {
+    getCount: function (dbKey, xuid) {
         let today = this.getTodayStr();
         let dbObj = dataDb.init(dbKey, {});
         let record = dbObj[xuid];
         if (!record || record.date !== today) return 0;
         return record.count;
     },
-    addCount: function(dbKey, xuid) {
+    addCount: function (dbKey, xuid) {
         let today = this.getTodayStr();
         let counts = dataDb.init(dbKey, {});
         counts[xuid] = { date: today, count: this.getCount(dbKey, xuid) + 1 };
         dataDb.set(dbKey, counts);
     },
-    acceptsTpa: function(xuid) {
+    acceptsTpa: function (xuid) {
         let settings = dataDb.init("tpaSettings", {});
         return settings[xuid] !== false;
     },
-    hasPendingRequest: function(senderXuid) {
+    hasPendingRequest: function (senderXuid) {
         for (let target in tpaQueue) {
             for (let req of tpaQueue[target]) {
                 if (req.senderXuid === senderXuid) return true;
@@ -625,56 +625,65 @@ const Util = {
 
 const Eco = {
     cfg: config.get("economy"),
-    getSpecific: function(player, sbName) {
+    getSpecific: function (player, sbName) {
         if (sbName === "llmoney") return money.get(player.xuid) || 0;
         let s = player.getScore(sbName);
         return (typeof s === 'number' && !isNaN(s)) ? s : 0;
     },
-    get: function(player) {
+    get: function (player) {
         return this.getSpecific(player, this.cfg.type === "llmoney" ? "llmoney" : this.cfg.sbName);
     },
-    set: function(player, amount) {
+
+    _safeSetScore: function (player, amount) {
+        let res = player.setScore(this.cfg.sbName, amount);
+        if (res === false) {
+            res = player.setScore(this.cfg.sbName, amount);
+        }
+        return res === true;
+    },
+
+    set: function (player, amount) {
         amount = Math.floor(amount);
         if (this.cfg.type === "llmoney") return money.set(player.xuid, amount);
-        else return player.setScore(this.cfg.sbName, amount) !== null;
+        else return this._safeSetScore(player, amount);
     },
-    reduce: function(player, amount) {
+    reduce: function (player, amount) {
         amount = Math.floor(amount);
         if (amount <= 0) return true;
         let current = this.get(player);
         if (current < amount) return false;
         if (this.cfg.type === "llmoney") return money.reduce(player.xuid, amount);
-        else return player.setScore(this.cfg.sbName, current - amount) !== null;
+        else return this._safeSetScore(player, current - amount);
     },
-    add: function(player, amount) {
+    add: function (player, amount) {
         amount = Math.floor(amount);
         if (amount <= 0) return true;
         if (this.cfg.type === "llmoney") return money.add(player.xuid, amount);
-        else return player.setScore(this.cfg.sbName, this.get(player) + amount) !== null;
+        else return this._safeSetScore(player, this.get(player) + amount);
     }
 };
 
 function checkWordFilter(text) {
     let wfConfig = config.get("wordFilter");
     if (!wfConfig || !wfConfig.enabled) return true;
-    let words = wfConfig.words ||[];
+    let words = wfConfig.words || [];
     let lowerText = text.toLowerCase();
     for (let word of words) {
-        if (lowerText.includes(word.toLowerCase())) return false; 
+        if (lowerText.includes(word.toLowerCase())) return false;
     }
-    return true; 
+    return true;
 }
 
 mc.listen("onTick", () => {
     currentTick++;
-    
+
     tickTimestamps[tickIndex] = Date.now();
     tickIndex = (tickIndex + 1) % TPS_HISTORY_SIZE;
     tickTotalCount++;
 
     if (currentTick % 100 === 0 && csvLogQueue.length > 0) {
         let grouped = {};
-        while(csvLogQueue.length > 0) {
+        while (csvLogQueue.length > 0) {
             let item = csvLogQueue.shift();
             if (!grouped[item.today]) grouped[item.today] = [];
             grouped[item.today].push(item.line);
@@ -688,7 +697,7 @@ mc.listen("onTick", () => {
         }
     }
 
-    if (currentTick % 20 === 0) { 
+    if (currentTick % 20 === 0) {
         for (let targetXuid in tpaQueue) {
             let queue = tpaQueue[targetXuid];
             for (let i = queue.length - 1; i >= 0; i--) {
@@ -702,7 +711,7 @@ mc.listen("onTick", () => {
                         let countForRefund = currentCount > 0 ? currentCount - 1 : 0;
                         let baseCost = Formulas.tpaCost(countForRefund);
                         let refund = Math.floor(baseCost * config.get("tpa").refundRate);
-                        
+
                         if (refund > 0) {
                             Eco.add(senderPlayer, refund);
                             sendMsg(senderPlayer, "tpa.expired.sender.refund", { name: req.targetName, refund: refund });
@@ -734,7 +743,7 @@ mc.listen("onTick", () => {
         let pDbCfg = config.get("playerDatabase");
         if (pDbCfg && pDbCfg.enabled) {
             let now = Date.now();
-            let inc = 1.05; 
+            let inc = 1.05;
             let tpsCfg = config.get("tps");
             if (tpsCfg && tpsCfg.enabled) {
                 if (lastOnlineTimeCalcTimestamp > 0) {
@@ -759,7 +768,7 @@ mc.listen("onTick", () => {
                 if (now - lastBackup >= (pDbCfg.backupIntervalDays || 1) * 86400000) {
                     let keys = pdbKV.listKey();
                     let exportObj = {};
-                    for(let k of keys) {
+                    for (let k of keys) {
                         let raw = pdbKV.get(k);
                         if (raw) exportObj[k] = JSON.parse(raw);
                     }
@@ -777,9 +786,9 @@ mc.listen("onTick", () => {
 mc.listen("onPlayerDie", (player, source) => {
     if (player.isSimulatedPlayer() || !config.get("back").enabled) return;
     let pos = player.pos;
-    let records = deathDb.get(player.xuid) ||[];
+    let records = deathDb.get(player.xuid) || [];
     records.unshift({ x: pos.x, y: pos.y, z: pos.z, dimid: pos.dimid, time: system.getTimeStr() });
-    
+
     let max = config.get("back").maxDeathRecords;
     if (records.length > max) records = records.slice(0, max);
     deathDb.set(player.xuid, records);
@@ -803,12 +812,12 @@ mc.listen("onPreJoin", (player) => {
 
 mc.listen("onJoin", (player) => {
     if (player.isSimulatedPlayer()) return;
-    
+
     if (config.get("ban").enabled) {
         let dv = player.getDevice();
         let clientId = dv ? dv.clientId : null;
         let ip = getPureIp(dv ? dv.ip : player.ip);
-        
+
         logger.info(`开始进行 ${player.realName} 本地深度黑名单检查`);
         let res = checkLocalBan(player.xuid, player.realName, ip, clientId);
         if (res.banned) {
@@ -820,14 +829,14 @@ mc.listen("onJoin", (player) => {
             logger.info(`${player.realName} 本地深度黑名单检查通过`);
             csvLog("BanCheck", "System", `${player.realName} passed local deep ban check`);
         }
-        
+
         checkCloudBan(player.xuid, player.realName, ip, clientId, (banned, reason) => {
             if (banned) {
                 let p = mc.getPlayer(player.xuid);
                 if (p) p.kick(tr(p, "ban.kick.cloud", { reason: reason }));
-                
+
                 if (config.get("ban").cloudRecordToLocal) {
-                    addLocalBan({xuid: player.xuid, name: player.realName, ip: ip, clientId: clientId}, "Cloud Ban: " + reason, null);
+                    addLocalBan({ xuid: player.xuid, name: player.realName, ip: ip, clientId: clientId }, "Cloud Ban: " + reason, null);
                 }
             }
         });
@@ -847,19 +856,19 @@ mc.listen("onJoin", (player) => {
             isNew = true;
             pData = {
                 name: realName,
-                historyname:[],
+                historyname: [],
                 IPs: [],
-                clientIDs:[],
+                clientIDs: [],
                 OnlineTime: 0,
                 lastOnlineTime: Date.now()
             };
         } else {
             if (!pData.historyname) pData.historyname = [];
-            if (!pData.IPs) pData.IPs =[];
-            if (!pData.clientIDs) pData.clientIDs =[];
+            if (!pData.IPs) pData.IPs = [];
+            if (!pData.clientIDs) pData.clientIDs = [];
             if (pData.OnlineTime == null) pData.OnlineTime = 0;
             pData.lastOnlineTime = Date.now();
-            
+
             if (pData.name !== realName) {
                 if (!pData.historyname.includes(pData.name)) pData.historyname.push(pData.name);
                 pData.name = realName;
@@ -868,15 +877,15 @@ mc.listen("onJoin", (player) => {
 
         if (ip && !pData.IPs.includes(ip)) pData.IPs.push(ip);
         if (cid && !pData.clientIDs.includes(cid)) pData.clientIDs.push(cid);
-        
+
         pdbKV.set(xuid, JSON.stringify(pData));
 
         if (isNew) {
             let regData = JSON.parse(regDb.read() || '{"total":0,"records":{}}');
             regData.total = (regData.total || 0) + 1;
             let tm = system.getTimeObj();
-            let dateStr = `${tm.Y}-${String(tm.M).padStart(2,'0')}-${String(tm.D).padStart(2,'0')}`;
-            let timeStr = `${String(tm.h).padStart(2,'0')}:${String(tm.m).padStart(2,'0')}:${String(tm.s).padStart(2,'0')}`;
+            let dateStr = `${tm.Y}-${String(tm.M).padStart(2, '0')}-${String(tm.D).padStart(2, '0')}`;
+            let timeStr = `${String(tm.h).padStart(2, '0')}:${String(tm.m).padStart(2, '0')}:${String(tm.s).padStart(2, '0')}`;
             if (!regData.records) regData.records = {};
             regData.records[xuid] = {
                 name: realName,
@@ -924,7 +933,7 @@ mc.listen("onJoin", (player) => {
                     sendNoticeForm(p, currentNotice, noticeHash, false);
                 }
             }
-        }, 5000); 
+        }, 5000);
     }
 });
 
@@ -951,7 +960,7 @@ mc.listen("onServerStarted", () => {
     if (config.get("tps").enabled) registerTpsCommands();
     if (config.get("ban").enabled) registerBanCommands();
     if (config.get("notice").enabled) registerNoticeCommand();
-    
+
     if (config.get("customCommands") && config.get("customCommands").enabled) {
         registerCusCmdSys();
     }
@@ -961,7 +970,7 @@ mc.listen("onServerStarted", () => {
     if (config.get("playerDatabase") && config.get("playerDatabase").enabled) {
         registerPlayerDatabaseCommand();
     }
-    
+
     startDynamicMotd();
 });
 
@@ -983,7 +992,7 @@ function processTpr(player) {
 
     let cfg = config.get("tpr");
     if (!cfg.enabled) { sendMsg(player, "tpr.disabled"); return; }
-    
+
     let dimCfg = cfg.dimensions[player.pos.dimid];
     if (!dimCfg || !dimCfg.enabled) { sendMsg(player, "tpr.dim_disabled"); return; }
 
@@ -1006,7 +1015,7 @@ function processTpr(player) {
 
     activeTprPlayers[player.xuid] = true;
     let maxTotalTicks = Math.ceil((cfg.maxAttempts * cfg.loadDelayMs) / 1000 * 20) + 200;
-    player.addEffect(27, maxTotalTicks, 1, false); 
+    player.addEffect(27, maxTotalTicks, 1, false);
     player.addEffect(11, maxTotalTicks, 5, false);
 
     startTprSearch(player, cost, dimCfg, 0, player.pos, cfg);
@@ -1016,7 +1025,7 @@ function isSafeBodySpace(block) {
     if (!block || typeof block.type !== 'string') return false;
     if (block.isAir) return true;
     let t = block.type;
-    const passables =["tallgrass", "double_plant", "yellow_flower", "red_flower", "snow_layer", "brown_mushroom", "red_mushroom", "deadbush", "fern", "vine", "waterlily", "torch", "sign", "lantern"];
+    const passables = ["tallgrass", "double_plant", "yellow_flower", "red_flower", "snow_layer", "brown_mushroom", "red_mushroom", "deadbush", "fern", "vine", "waterlily", "torch", "sign", "lantern"];
     for (let p of passables) {
         if (t.includes(p)) return true;
     }
@@ -1026,7 +1035,7 @@ function isSafeBodySpace(block) {
 function isDangerousSurface(block) {
     if (!block || typeof block.type !== 'string') return true;
     let t = block.type;
-    const dangers =["lava", "water", "fire", "magma", "powder_snow", "cactus", "sweet_berry_bush", "air", "void", "bedrock"];
+    const dangers = ["lava", "water", "fire", "magma", "powder_snow", "cactus", "sweet_berry_bush", "air", "void", "bedrock"];
     for (let d of dangers) {
         if (t.includes(d)) return true;
     }
@@ -1040,14 +1049,14 @@ function startTprSearch(player, cost, dimCfg, attempts, originalPos, cfg) {
         player.removeEffect(11);
         player.teleport(originalPos.x, originalPos.y, originalPos.z, originalPos.dimid);
         Eco.add(player, cost);
-        
+
         let counts = dataDb.init("tprCounts", {});
         let today = Util.getTodayStr();
         if (counts[player.xuid] && counts[player.xuid].date === today && counts[player.xuid].count > 0) {
             counts[player.xuid].count--;
             dataDb.set("tprCounts", counts);
         }
-        
+
         sendMsg(player, "tpr.failed");
         csvLog("TPR", player.realName, `TPR failed after ${cfg.maxAttempts} attempts, refunded`);
         return;
@@ -1066,7 +1075,7 @@ function startTprSearch(player, cost, dimCfg, attempts, originalPos, cfg) {
 
     let maxY = dimCfg.maxY;
     let targetDim = originalPos.dimid;
-    
+
     player.teleport(rx, maxY, rz, targetDim);
     player.refreshChunks();
     sendMsg(player, "tpr.searching", { attempt: attempts + 1, max: cfg.maxAttempts });
@@ -1080,13 +1089,13 @@ function startTprSearch(player, cost, dimCfg, attempts, originalPos, cfg) {
 
         let found = false;
         let safeY = maxY;
-        
+
         for (let y = maxY; y > 0; y--) {
             let b1 = mc.getBlock(rx, y - 1, rz, targetDim);
             let b2 = mc.getBlock(rx, y, rz, targetDim);
             let b3 = mc.getBlock(rx, y + 1, rz, targetDim);
 
-            if (!b1 || !b2 || !b3) break; 
+            if (!b1 || !b2 || !b3) break;
 
             if (!isSafeBodySpace(b1)) {
                 if (!isDangerousSurface(b1) && isSafeBodySpace(b2) && isSafeBodySpace(b3)) {
@@ -1101,8 +1110,8 @@ function startTprSearch(player, cost, dimCfg, attempts, originalPos, cfg) {
 
         if (found) {
             delete activeTprPlayers[p.xuid];
-            p.addEffect(27, 20 * 10, 1, false); 
-            p.addEffect(11, 20 * 10, 5, false); 
+            p.addEffect(27, 20 * 10, 1, false);
+            p.addEffect(11, 20 * 10, 5, false);
             p.teleport(rx, safeY, rz, targetDim);
             sendMsg(p, "tpr.success", { x: rx, y: safeY, z: rz, cost: cost });
             csvLog("TPR", p.realName, `TPR success to ${rx}, ${safeY}, ${rz}`);
@@ -1116,7 +1125,7 @@ function startTprSearch(player, cost, dimCfg, attempts, originalPos, cfg) {
 function getAvgTps(expectedSeconds) {
     if (tickTotalCount < 2) return (20.00).toFixed(2);
     let targetIntervals = expectedSeconds * 20;
-    
+
     let actualIntervals = Math.min(tickTotalCount - 1, targetIntervals, TPS_HISTORY_SIZE - 1);
 
     let newestIdx = (tickIndex - 1 + TPS_HISTORY_SIZE) % TPS_HISTORY_SIZE;
@@ -1162,18 +1171,18 @@ function getTpsGraph() {
         let tickCount = buckets[targetId] || 0;
         let avg = tickCount / 10;
 
-        if (avg >= 19) graph += "§2▍";       
-        else if (avg >= 15) graph += "§a▍";  
-        else if (avg >= 10) graph += "§e▍";  
-        else if (avg >= 4) graph += "§6▍";   
-        else graph += "§4▍";                 
+        if (avg >= 19) graph += "§2▍";
+        else if (avg >= 15) graph += "§a▍";
+        else if (avg >= 10) graph += "§e▍";
+        else if (avg >= 4) graph += "§6▍";
+        else graph += "§4▍";
     }
     return graph;
 }
 
 function registerTpsCommands() {
     let cfg = config.get("tps");
-    
+
     if (cfg.playerEnabled) {
         let cmdTps = mc.newCommand("tps", "查询服务器TPS", PermType.Any);
         cmdTps.overload([]);
@@ -1182,16 +1191,16 @@ function registerTpsCommands() {
             let pl = origin.player;
             let cost = Math.floor(Formulas.tpsCost(Util.getCount("tpsCounts", pl.xuid)));
             if (isNaN(cost) || cost < 0) cost = 0;
-            
-            if (Eco.get(pl) < cost) { 
+
+            if (Eco.get(pl) < cost) {
                 sendMsg(pl, "tps.player.nomoney", { cost: cost });
-                return; 
+                return;
             }
             if (!Eco.reduce(pl, cost)) {
                 sendMsg(pl, "error.deduct");
                 return;
             }
-            
+
             Util.addCount("tpsCounts", pl.xuid);
             let currentTps = getAvgTps(1);
             sendMsg(pl, "tps.player.success", { tps: currentTps, cost: cost });
@@ -1212,7 +1221,7 @@ function registerTpsCommands() {
             tr(p, "tps.admin.10m", { tps: getAvgTps(600) }) +
             tr(p, "tps.admin.graph") +
             getTpsGraph();
-        
+
         if (p) p.tell(out);
         else logger.info("\n" + out.replace(/§[0-9a-fk-or]/g, ""));
     });
@@ -1221,36 +1230,36 @@ function registerTpsCommands() {
 
 function mergeBans(bans) {
     let merged = true;
-    while(merged) {
+    while (merged) {
         merged = false;
         for (let i = 0; i < bans.length; i++) {
             for (let j = i + 1; j < bans.length; j++) {
                 let b1 = bans[i], b2 = bans[j];
-                let intersect = b1.xuids.some(x=>b2.xuids.includes(x)) || 
-                                b1.names.some(n=>b2.names.includes(n)) ||
-                                b1.ips.some(ip=>b2.ips.includes(ip)) ||
-                                b1.clientIds.some(c=>b2.clientIds.includes(c));
+                let intersect = b1.xuids.some(x => b2.xuids.includes(x)) ||
+                    b1.names.some(n => b2.names.includes(n)) ||
+                    b1.ips.some(ip => b2.ips.includes(ip)) ||
+                    b1.clientIds.some(c => b2.clientIds.includes(c));
                 if (intersect) {
                     b1.xuids = [...new Set([...b1.xuids, ...b2.xuids])];
                     b1.names = [...new Set([...b1.names, ...b2.names])];
                     b1.ips = [...new Set([...b1.ips, ...b2.ips])];
                     b1.clientIds = [...new Set([...b1.clientIds, ...b2.clientIds])];
-                    if (!b1.expireTime || !b2.expireTime) b1.expireTime = null; 
+                    if (!b1.expireTime || !b2.expireTime) b1.expireTime = null;
                     else b1.expireTime = Math.max(b1.expireTime, b2.expireTime);
-                    
+
                     bans.splice(j, 1);
                     merged = true;
                     break;
                 }
             }
-            if(merged) break;
+            if (merged) break;
         }
     }
     return bans;
 }
 
 function checkLocalBan(xuid, name, ip, clientId) {
-    let bans = banDb.get("list") ||[];
+    let bans = banDb.get("list") || [];
     let isBanned = false;
     let matchedBan = null;
     let now = Date.now();
@@ -1263,13 +1272,13 @@ function checkLocalBan(xuid, name, ip, clientId) {
             modified = true;
             continue;
         }
-        
+
         let match = false;
         if (xuid && b.xuids.includes(xuid)) match = true;
         if (name && b.names.includes(name)) match = true;
         if (ip && b.ips.includes(ip)) match = true;
         if (clientId && b.clientIds.includes(clientId)) match = true;
-        
+
         if (match) {
             isBanned = true;
             matchedBan = b;
@@ -1279,25 +1288,25 @@ function checkLocalBan(xuid, name, ip, clientId) {
             if (clientId && !b.clientIds.includes(clientId)) { b.clientIds.push(clientId); modified = true; }
         }
     }
-    
+
     if (modified) {
         bans = mergeBans(bans);
         banDb.set("list", bans);
     }
-    
+
     if (isBanned) return { banned: true, reason: matchedBan.reason };
     return { banned: false };
 }
 
 function addLocalBan(info, reason, durationDays) {
-    let bans = banDb.get("list") ||[];
+    let bans = banDb.get("list") || [];
     let expire = durationDays ? Date.now() + durationDays * 86400000 : null;
     let newBan = {
         id: system.randomGuid(),
-        xuids: Array.isArray(info.xuid) ? info.xuid : (info.xuid ? [info.xuid] :[]),
-        names: Array.isArray(info.name) ? info.name : (info.name ? [info.name] :[]),
-        ips: Array.isArray(info.ip) ? info.ip : (info.ip ? [info.ip] :[]),
-        clientIds: Array.isArray(info.clientId) ? info.clientId : (info.clientId ? [info.clientId] :[]),
+        xuids: Array.isArray(info.xuid) ? info.xuid : (info.xuid ? [info.xuid] : []),
+        names: Array.isArray(info.name) ? info.name : (info.name ? [info.name] : []),
+        ips: Array.isArray(info.ip) ? info.ip : (info.ip ? [info.ip] : []),
+        clientIds: Array.isArray(info.clientId) ? info.clientId : (info.clientId ? [info.clientId] : []),
         reason: reason || tr(null, "ban.reason.default"),
         expireTime: expire
     };
@@ -1314,7 +1323,7 @@ function checkCloudBan(xuid, name, ip, clientId, callback) {
         callback(false, "");
         return;
     }
-    
+
     let isBanned = false;
     let finalReason = "";
 
@@ -1330,7 +1339,7 @@ function checkCloudBan(xuid, name, ip, clientId, callback) {
 
     if (cfg.cloudBlackBE) {
         logger.info(`开始进行 ${name} BlackBE云端黑名单检查`);
-        let url = `https://api.blackbe.work/openapi/v3/check/?xuid=${xuid||""}&name=${name||""}`;
+        let url = `https://api.blackbe.work/openapi/v3/check/?xuid=${xuid || ""}&name=${name || ""}`;
         network.httpGet(url, (status, result) => {
             if (status === 200 && result) {
                 try {
@@ -1344,7 +1353,7 @@ function checkCloudBan(xuid, name, ip, clientId, callback) {
                         logger.info(`${name} BlackBE云端黑名单检查通过`);
                         csvLog("BanCheck", "System", `${name} passed BlackBE cloud ban check`);
                     }
-                } catch(e) {
+                } catch (e) {
                     logger.info(`${name} BlackBE云端黑名单检查接口异常`);
                     csvLog("BanCheck", "System", `${name} BlackBE API parse error`);
                 }
@@ -1358,7 +1367,7 @@ function checkCloudBan(xuid, name, ip, clientId, callback) {
 
     if (cfg.cloudUniteBan) {
         logger.info(`开始进行 ${name} UniteBan云端黑名单检查`);
-        let url = `https://uniteban.megastudio.cn/api/check_ban.php?xuid=${xuid||""}`;
+        let url = `https://uniteban.megastudio.cn/api/check_ban.php?xuid=${xuid || ""}`;
         if (ip) url += `&ip_address=${ip}`;
         if (clientId) url += `&client_id=${clientId}`;
         network.httpGet(url, (status, result) => {
@@ -1374,7 +1383,7 @@ function checkCloudBan(xuid, name, ip, clientId, callback) {
                         logger.info(`${name} UniteBan云端黑名单检查通过`);
                         csvLog("BanCheck", "System", `${name} passed UniteBan cloud ban check`);
                     }
-                } catch(e) {
+                } catch (e) {
                     logger.info(`${name} UniteBan云端黑名单检查接口异常`);
                     csvLog("BanCheck", "System", `${name} UniteBan API parse error`);
                 }
@@ -1390,13 +1399,13 @@ function checkCloudBan(xuid, name, ip, clientId, callback) {
 function sendBanForm(admin) {
     let onlinePlayers = mc.getOnlinePlayers().filter(p => !p.isSimulatedPlayer());
     let names = onlinePlayers.map(p => p.realName);
-    
+
     let fm = mc.newCustomForm().setTitle(tr(admin, "ban.form.title"));
     fm.addDropdown(tr(admin, "ban.form.dropdown"), [tr(admin, "ban.form.dropdown.empty"), ...names], 0);
     fm.addInput(tr(admin, "ban.form.input_name"), "Name or XUID", "");
     fm.addInput(tr(admin, "ban.form.input_days"), tr(admin, "ban.form.days_ph"), "");
     fm.addInput(tr(admin, "ban.form.input_reason"), tr(admin, "ban.form.reason_ph"), tr(admin, "ban.reason.default"));
-    
+
     admin.sendForm(fm, (pl, data) => {
         if (!data) return;
         let targetStr = "";
@@ -1405,7 +1414,7 @@ function sendBanForm(admin) {
         if (data[1] && data[1].trim() !== "") {
             targetStr = data[1].trim();
         } else if (data[0] > 0) {
-            targetPlayer = onlinePlayers[data[0]-1];
+            targetPlayer = onlinePlayers[data[0] - 1];
             targetStr = targetPlayer.realName;
         } else {
             sendMsg(pl, "error.player_only");
@@ -1421,8 +1430,8 @@ function sendBanForm(admin) {
 }
 
 function processBan(admin, targetStr, targetPlayer, days, reason) {
-    let info = { xuid: [], name: [], ip: [], clientId:[] };
-    
+    let info = { xuid: [], name: [], ip: [], clientId: [] };
+
     if (!targetPlayer) {
         let tp = mc.getPlayer(targetStr);
         if (tp) targetPlayer = tp;
@@ -1443,7 +1452,7 @@ function processBan(admin, targetStr, targetPlayer, days, reason) {
     if (config.get("playerDatabase") && config.get("playerDatabase").enabled) {
         let pData = null;
         let pXuid = info.xuid.length > 0 ? info.xuid[0] : null;
-        
+
         if (pXuid) {
             let raw = pdbKV.get(pXuid);
             if (raw) pData = JSON.parse(raw);
@@ -1462,7 +1471,7 @@ function processBan(admin, targetStr, targetPlayer, days, reason) {
                 }
             }
         }
-        
+
         if (pData) {
             if (pData.name && !info.name.includes(pData.name)) info.name.push(pData.name);
             if (pData.historyname) pData.historyname.forEach(n => { if (!info.name.includes(n)) info.name.push(n); });
@@ -1472,22 +1481,22 @@ function processBan(admin, targetStr, targetPlayer, days, reason) {
     }
 
     addLocalBan(info, reason, days);
-    
+
     let targetP = targetPlayer || (info.xuid.length > 0 ? mc.getPlayer(info.xuid[0]) : null) || (info.name.length > 0 ? mc.getPlayer(info.name[0]) : null);
     if (targetP) targetP.kick(tr(targetP, "ban.kick.local", { reason: reason }));
 
     sendMsg(admin.tell ? admin : null, "ban.success");
     let tNameOrXuid = info.name.length > 0 ? info.name[0] : (info.xuid.length > 0 ? info.xuid[0] : "Unknown");
-    csvLog("Ban", admin.realName || "Console", `Banned ${tNameOrXuid} for ${days ? days+" days" : "forever"}`);
+    csvLog("Ban", admin.realName || "Console", `Banned ${tNameOrXuid} for ${days ? days + " days" : "forever"}`);
 }
 
 function sendUnbanForm(admin) {
-    let bans = banDb.get("list") ||[];
+    let bans = banDb.get("list") || [];
     if (bans.length === 0) {
         sendMsg(admin, "unban.none");
         return;
     }
-    
+
     let fm = mc.newSimpleForm().setTitle(tr(admin, "unban.form.title"));
     bans.forEach(b => {
         let title = (b.names.length > 0 ? b.names.join(", ") : b.xuids.join(", "));
@@ -1507,7 +1516,7 @@ function sendUnbanForm(admin) {
 }
 
 function processUnbanStr(admin, targetStr) {
-    let bans = banDb.get("list") ||[];
+    let bans = banDb.get("list") || [];
     let found = -1;
     for (let i = 0; i < bans.length; i++) {
         if (bans[i].xuids.includes(targetStr) || bans[i].names.includes(targetStr)) {
@@ -1531,7 +1540,7 @@ function registerBanCommands() {
     cmdBan.overload([]);
     cmdBan.setCallback((cmd, origin, out, results) => {
         if (!origin.player) {
-            if (results.target) processBan({realName: "Console"}, results.target, null, null, tr(null, "ban.reason.default"));
+            if (results.target) processBan({ realName: "Console" }, results.target, null, null, tr(null, "ban.reason.default"));
             else out.error(tr(null, "unban.console_err"));
             return;
         }
@@ -1549,7 +1558,7 @@ function registerBanCommands() {
     cmdUnban.overload([]);
     cmdUnban.setCallback((cmd, origin, out, results) => {
         if (!origin.player) {
-            if (results.target) processUnbanStr({realName: "Console"}, results.target);
+            if (results.target) processUnbanStr({ realName: "Console" }, results.target);
             else out.error(tr(null, "unban.console_err"));
             return;
         }
@@ -1578,7 +1587,7 @@ function registerHomeCommands() {
     cmdHome.overload([]);
     cmdHome.overload(["action"]);
     cmdHome.overload(["action", "name"]);
-    
+
     cmdHome.setCallback((cmd, origin, out, results) => {
         if (!origin.player || origin.player.isSimulatedPlayer()) return;
         let pl = origin.player;
@@ -1630,7 +1639,7 @@ function processHomeAdd(pl, name) {
     if (!name || name.trim() === "") return;
     let homes = homeDb.get(pl.xuid) || {};
     if (homes[name]) { sendMsg(pl, "home.add.exist", { name: name }); return; }
-    
+
     let currentCount = Object.keys(homes).length;
     let cost = Math.floor(Formulas.homeAddCost(currentCount));
     if (isNaN(cost) || cost < 0) cost = 0;
@@ -1708,7 +1717,7 @@ function sendHomeDeleteForm(pl) {
     let homes = homeDb.get(pl.xuid) || {};
     let names = Object.keys(homes);
     if (names.length === 0) { sendMsg(pl, "home.none"); return; }
-    
+
     let fm = mc.newSimpleForm().setTitle(tr(pl, "home.delete.title")).setContent("");
     names.forEach(n => fm.addButton(n));
     pl.sendForm(fm, (player, id) => { if (id != null) processHomeDelete(player, names[id]); });
@@ -1718,7 +1727,7 @@ function sendHomeGoForm(pl) {
     let homes = homeDb.get(pl.xuid) || {};
     let names = Object.keys(homes);
     if (names.length === 0) { sendMsg(pl, "home.none"); return; }
-    
+
     let fm = mc.newSimpleForm().setTitle(tr(pl, "home.go.title")).setContent("");
     names.forEach(n => fm.addButton(n));
     pl.sendForm(fm, (player, id) => { if (id != null) processHomeGo(player, names[id]); });
@@ -1738,7 +1747,7 @@ function sendHomePublishMainForm(pl) {
 function sendHomePublishCreateForm(pl) {
     let cfg = config.get("home").publish;
     if (!cfg.enabled) { sendMsg(pl, "home.pub.disabled"); return; }
-    
+
     let pubHomes = getPubHomes();
     let globalCount = Object.keys(pubHomes).length;
     if (globalCount >= cfg.maxGlobal) { sendMsg(pl, "home.pub.full_global"); return; }
@@ -1748,7 +1757,7 @@ function sendHomePublishCreateForm(pl) {
     if (playerPubCount >= cfg.maxPerPlayer) { sendMsg(pl, "home.pub.full_player"); return; }
 
     let homes = homeDb.get(pl.xuid) || {};
-    let availableHomes =[];
+    let availableHomes = [];
     for (let name of Object.keys(homes)) {
         if (!pubHomes[pl.xuid + "_" + name]) availableHomes.push(name);
     }
@@ -1792,7 +1801,7 @@ function sendHomePublishCreateForm(pl) {
 
 function sendHomePublishRemoveForm(pl) {
     let pubHomes = getPubHomes();
-    let myPubs =[];
+    let myPubs = [];
     for (let k in pubHomes) { if (pubHomes[k].publisherXuid === pl.xuid) myPubs.push(pubHomes[k]); }
 
     if (myPubs.length === 0) { sendMsg(pl, "home.pub.remove.none"); return; }
@@ -1829,7 +1838,7 @@ function sendPubHomeListForm(pl) {
     pl.sendForm(fm, (player, id) => {
         if (id == null) return;
         let selected = list[id];
-        let count = Util.getCount("homeGoCounts", player.xuid); 
+        let count = Util.getCount("homeGoCounts", player.xuid);
         let cost = Math.floor(Formulas.homeGoCost(count));
         if (isNaN(cost) || cost < 0) cost = 0;
 
@@ -1848,7 +1857,7 @@ function sendPubHomeAdminForm(pl) {
     let keys = Object.keys(pubHomes);
     if (keys.length === 0) { sendMsg(pl, "home.pub.list.none"); return; }
 
-    let list = keys.map(k => ({id: k, data: pubHomes[k]}));
+    let list = keys.map(k => ({ id: k, data: pubHomes[k] }));
     let fm = mc.newSimpleForm().setTitle(tr(pl, "home.pub.admin.title")).setContent(tr(pl, "home.pub.admin.desc"));
     list.forEach(p => fm.addButton(`[${p.data.publisherName}] ${p.data.name}`));
 
@@ -1873,10 +1882,10 @@ function registerSuicideCommands() {
         let pl = origin.player;
         let cost = Math.floor(Formulas.suicideCost(Util.getCount("suicideCounts", pl.xuid)));
         if (isNaN(cost) || cost < 0) cost = 0;
-        
+
         if (Eco.get(pl) < cost) { sendMsg(pl, "suicide.nomoney", { cost: cost }); return; }
         if (!Eco.reduce(pl, cost)) { sendMsg(pl, "error.deduct"); return; }
-        
+
         Util.addCount("suicideCounts", pl.xuid);
         pl.kill();
         sendMsg(pl, "suicide.success", { cost: cost });
@@ -1894,9 +1903,9 @@ function registerBackCommands() {
     cmdBack.setCallback((cmd, origin, out, results) => {
         if (!origin.player || origin.player.isSimulatedPlayer()) return;
         let pl = origin.player;
-        let records = deathDb.get(pl.xuid) ||[];
+        let records = deathDb.get(pl.xuid) || [];
         if (records.length === 0) { sendMsg(pl, "back.none"); return; }
-        
+
         if (results.action === "gui") sendBackForm(pl, records);
         else processBack(pl, records, 0);
     });
@@ -1921,10 +1930,10 @@ function processBack(pl, records, recordIndex) {
     if (recordIndex < 0 || recordIndex >= records.length) return;
     let cost = Math.floor(Formulas.backCost(Util.getCount("backCounts", pl.xuid), recordIndex + 1));
     if (isNaN(cost) || cost < 0) cost = 0;
-    
+
     if (Eco.get(pl) < cost) { sendMsg(pl, "back.nomoney", { cost: cost }); return; }
     if (!Eco.reduce(pl, cost)) { sendMsg(pl, "error.deduct"); return; }
-    
+
     Util.addCount("backCounts", pl.xuid);
     let r = records[recordIndex];
     pl.teleport(r.x, r.y, r.z, r.dimid);
@@ -1964,14 +1973,14 @@ function getWarpsObj() { let content = warpDb.read(); return content ? JSON.pars
 function processWarpGo(player, name) {
     let warps = getWarpsObj();
     if (!warps[name]) { sendMsg(player, "warp.not_found", { name: name }); return; }
-    
+
     let w = warps[name];
     let cost = Math.floor(Formulas.warpCost(Util.getCount("warpCounts", player.xuid)));
     if (isNaN(cost) || cost < 0) cost = 0;
-    
+
     if (Eco.get(player) < cost) { sendMsg(player, "warp.nomoney", { cost: cost }); return; }
     if (!Eco.reduce(player, cost)) { sendMsg(player, "error.deduct"); return; }
-    
+
     Util.addCount("warpCounts", player.xuid);
     player.teleport(w.x, w.y, w.z, w.dimid);
     sendMsg(player, "warp.success", { name: name, cost: cost });
@@ -1985,7 +1994,7 @@ function sendWarpSetMenu(player) {
         .addButton(tr(player, "warp.manage.edit"))
         .addButton(tr(player, "warp.manage.delete"));
     player.sendForm(fm, (pl, id) => {
-        if (id == null) return; 
+        if (id == null) return;
         switch (id) {
             case 0: addWarpForm(pl, true); break;
             case 1: addWarpForm(pl, false); break;
@@ -2005,7 +2014,7 @@ function addWarpForm(player, isCurrent) {
     fm.addInput(tr(player, "warp.add.icon"), "textures/... (留空为无)", "");
 
     player.sendForm(fm, (pl, data) => {
-        if (data == null) return; 
+        if (data == null) return;
         let name = (data[0] || "").trim();
         if (name === "") return;
         let warps = getWarpsObj();
@@ -2029,13 +2038,13 @@ function addWarpForm(player, isCurrent) {
 function deleteWarpSelectForm(player) {
     let warps = getWarpsObj(), names = Object.keys(warps);
     if (names.length === 0) { sendMsg(player, "warp.none"); return; }
-    
+
     let fm = mc.newSimpleForm().setTitle(tr(player, "warp.del.title")).setContent(tr(player, "warp.del.content"));
     names.forEach(n => fm.addButton(n));
     player.sendForm(fm, (pl, id) => {
-        if (id != null) { 
-            warpDb.delete(names[id]); 
-            sendMsg(pl, "warp.del.success", { name: names[id] }); 
+        if (id != null) {
+            warpDb.delete(names[id]);
+            sendMsg(pl, "warp.del.success", { name: names[id] });
             csvLog("Warp", pl.realName, "Deleted warp " + names[id]);
         }
     });
@@ -2044,21 +2053,21 @@ function deleteWarpSelectForm(player) {
 function editWarpSelectForm(player) {
     let warps = getWarpsObj(), names = Object.keys(warps);
     if (names.length === 0) { sendMsg(player, "warp.none"); return; }
-    
+
     let fm = mc.newSimpleForm().setTitle(tr(player, "warp.edit.title")).setContent(tr(player, "warp.manage.content"));
     names.forEach(n => fm.addButton(n));
 
     player.sendForm(fm, (pl, id) => {
-        if (id == null) return; 
+        if (id == null) return;
         let tName = names[id], wData = warps[tName];
         let cfm = mc.newCustomForm().setTitle(tr(player, "warp.edit.title"))
             .addInput(tr(player, "warp.add.name"), "", tName)
             .addInput("X", "", wData.x.toString()).addInput("Y", "", wData.y.toString()).addInput("Z", "", wData.z.toString())
-            .addDropdown(tr(player, "warp.add.dim"),["主世界", "下界", "末地"], wData.dimid)
+            .addDropdown(tr(player, "warp.add.dim"), ["主世界", "下界", "末地"], wData.dimid)
             .addInput(tr(player, "warp.add.icon"), "textures/... (留空为无)", wData.icon || "");
 
         pl.sendForm(cfm, (pl2, data) => {
-            if (data == null) return; 
+            if (data == null) return;
             let newName = (data[0] || "").trim(), x = parseFloat(data[1]), y = parseFloat(data[2]), z = parseFloat(data[3]);
             if (newName === "" || isNaN(x) || isNaN(y) || isNaN(z)) { sendMsg(pl2, "warp.invalid"); return; }
             if (newName !== tName) warpDb.delete(tName);
@@ -2072,12 +2081,12 @@ function editWarpSelectForm(player) {
 function sendWarpForm(player) {
     let warps = getWarpsObj(), names = Object.keys(warps);
     if (names.length === 0) { sendMsg(player, "warp.none"); return; }
-    
+
     let fm = mc.newSimpleForm().setTitle(tr(player, "warp.title"));
     names.forEach(n => { let i = warps[n].icon; (i && i !== "") ? fm.addButton(n, i) : fm.addButton(n); });
-    
+
     player.sendForm(fm, (pl, id) => {
-        if (id == null) return; 
+        if (id == null) return;
         processWarpGo(pl, names[id]);
     });
 }
@@ -2116,7 +2125,7 @@ function registerTpaCommands() {
             for (let i = queue.length - 1; i >= 0; i--) {
                 if (queue[i].senderXuid === pl.xuid) {
                     let req = queue.splice(i, 1)[0];
-                    canceled++; 
+                    canceled++;
                     refundTotal += Math.floor(req.cost * rate);
                 }
             }
@@ -2193,9 +2202,9 @@ function sendTpaForm(player) {
     let pList = onlinePlayers.map(p => ({ xuid: p.xuid, name: p.realName }));
     let fm = mc.newCustomForm()
         .setTitle(tr(player, "tpa.form.title"))
-        .addLabel(tr(player, "tpa.form.desc"))  
-        .addDropdown(tr(player, "tpa.form.target"), pList.map(i => i.name), 0) 
-        .addDropdown(tr(player, "tpa.form.type"),[tr(player, "tpa.form.type.tpa"), tr(player, "tpa.form.type.tpahere")], 0);
+        .addLabel(tr(player, "tpa.form.desc"))
+        .addDropdown(tr(player, "tpa.form.target"), pList.map(i => i.name), 0)
+        .addDropdown(tr(player, "tpa.form.type"), [tr(player, "tpa.form.type.tpa"), tr(player, "tpa.form.type.tpahere")], 0);
 
     player.sendForm(fm, (pl, data) => {
         if (data == null) return;
@@ -2229,7 +2238,7 @@ function sendTpaConfirmForm(sender, targetXuid, targetName, type, cost) {
         tpaQueue[targetXuid].push(req);
         sendMsg(pl, "tpa.sent", { cost: cost });
         csvLog("TPA", pl.realName, `Sent TPA request to ${targetName}`);
-        
+
         targetPlayer.tell(
             tr(targetPlayer, "tpa.receive.title") +
             tr(targetPlayer, "tpa.receive.msg1", { name: pl.realName, type: tr(targetPlayer, type === 0 ? "tpa.receive.type.tpa" : "tpa.receive.type.tpahere") }) + "\n" +
@@ -2295,7 +2304,7 @@ let motdIndex = 0;
 function startDynamicMotd() {
     let cfg = config.get("motd");
     if (!cfg.enabled || !cfg.list || cfg.list.length === 0) return;
-    
+
     motdTaskId = setInterval(() => {
         let text = cfg.list[motdIndex];
         let onlineCount = mc.getOnlinePlayers().length;
@@ -2323,7 +2332,7 @@ function sendMoneyMainForm(player) {
 function sendTransferForm(player) {
     let onlinePlayers = mc.getOnlinePlayers().filter(p => p.xuid !== player.xuid);
     let pList = onlinePlayers.map(p => ({ xuid: p.xuid, name: p.realName }));
-    pList.unshift({xuid: null, name: tr(player, "eco.transfer.offline_search_hint")});
+    pList.unshift({ xuid: null, name: tr(player, "eco.transfer.offline_search_hint") });
 
     let taxRate = config.get("economy").transferTaxRate;
     let fm = mc.newCustomForm()
@@ -2351,20 +2360,20 @@ function sendTransferForm(player) {
         if (searchName !== "") {
             let minLen = config.get("playerDatabase").queryMinLength || 3;
             if (searchName.length < minLen) { pl.tell(PREFIX + tr(pl, "eco.transfer.search_tooshort", { min: minLen })); return; }
-            
+
             let keys = pdbKV.listKey();
-            let matches =[];
+            let matches = [];
             let lowerQ = searchName.toLowerCase();
-            for(let k of keys) {
+            for (let k of keys) {
                 let raw = pdbKV.get(k);
-                if(raw) {
+                if (raw) {
                     let d = JSON.parse(raw);
                     if (d.name.toLowerCase().includes(lowerQ) || (d.historyname && d.historyname.some(n => n.toLowerCase().includes(lowerQ)))) {
-                        if (k !== pl.xuid) matches.push({xuid: k, data: d});
+                        if (k !== pl.xuid) matches.push({ xuid: k, data: d });
                     }
                 }
             }
-            
+
             if (matches.length === 0) { pl.tell(PREFIX + tr(pl, "eco.transfer.search_none")); return; }
             if (matches.length === 1) {
                 sendTransferConfirmForm(pl, matches[0].xuid, matches[0].data.name, amount, totalCost, tax, note);
@@ -2397,11 +2406,11 @@ function sendTransferConfirmForm(player, targetXuid, targetName, amount, totalCo
         .setContent(tr(player, "eco.transfer.confirm.desc", { name: targetName, amount: amount, tax: tax, total: totalCost, note: note || tr(player, "general.none") }))
         .addButton(tr(player, "eco.transfer.confirm.yes"))
         .addButton(tr(player, "eco.transfer.confirm.no"));
-        
+
     player.sendForm(fm, (pl, id) => {
         if (id !== 0) return;
         if (Eco.get(pl) < totalCost) { sendMsg(pl, "eco.transfer.insufficient", { cost: totalCost, amount: amount, tax: tax }); return; }
-        
+
         if (Eco.reduce(pl, totalCost)) {
             let targetPlayer = mc.getPlayer(targetXuid);
             if (targetPlayer) {
@@ -2425,7 +2434,7 @@ function sendTransferConfirmForm(player, targetXuid, targetName, amount, totalCo
                     }
                 } else {
                     let offDb = JSON.parse(offlineDb.read() || "{}");
-                    if (!offDb[targetXuid]) offDb[targetXuid] =[];
+                    if (!offDb[targetXuid]) offDb[targetXuid] = [];
                     let tm = system.getTimeStr();
                     offDb[targetXuid].push({
                         senderName: pl.realName,
@@ -2451,13 +2460,13 @@ function registerLangCommands() {
     cmdLang.overload([]);
     cmdLang.setCallback((cmd, origin) => {
         if (!origin.player || origin.player.isSimulatedPlayer()) return;
-        let files = File.getFilesList(LANG_PATH) ||[], langs = files.map(f => f.replace(".json", ""));
+        let files = File.getFilesList(LANG_PATH) || [], langs = files.map(f => f.replace(".json", ""));
         if (!langs.includes("zh_CN")) langs.push("zh_CN");
         langs = [...new Set(langs)];
-        
+
         let fm = mc.newSimpleForm().setTitle(tr(origin.player, "lang.title")).setContent(tr(origin.player, "lang.desc"));
         langs.forEach(l => fm.addButton(l));
-        
+
         origin.player.sendForm(fm, (pl, id) => {
             if (id == null) return;
             let pLangs = dataDb.init("playerLangs", {});
@@ -2475,7 +2484,7 @@ function setupDynamicCmd(cmdName, cmdData) {
     if (cmdData.alias && cmdData.alias !== "") {
         dynCmd.setAlias(cmdData.alias);
     }
-    
+
     if (cmdData.hasArgs) {
         dynCmd.optional("args", ParamType.RawText);
         dynCmd.overload(["args"]);
@@ -2484,7 +2493,7 @@ function setupDynamicCmd(cmdName, cmdData) {
 
     dynCmd.setCallback((cmd, origin, out, results) => {
         if (!origin.player || origin.player.isSimulatedPlayer()) return;
-        
+
         let liveCmds = cusCmdDb.get("list") || {};
         if (!liveCmds[cmdName]) {
             out.error(tr(origin.player, "cuscmd.error.deleted"));
@@ -2493,7 +2502,7 @@ function setupDynamicCmd(cmdName, cmdData) {
 
         let liveData = liveCmds[cmdName];
         let finalCmd = liveData.targetCmd.replace(/%name%/g, '"' + origin.player.realName + '"');
-        
+
         if (liveData.hasArgs && results.args) {
             finalCmd += " " + results.args;
         }
@@ -2554,13 +2563,13 @@ function sendCusCmdCreateForm(player) {
         .addInput(tr(player, "cuscmd.form.desc"), tr(player, "cuscmd.form.desc_ph"), tr(player, "cuscmd.form.desc_def"))
         .addInput(tr(player, "cuscmd.form.alias"), tr(player, "cuscmd.form.alias_ph"))
         .addInput(tr(player, "cuscmd.form.target"), tr(player, "cuscmd.form.target_ph"))
-        .addDropdown(tr(player, "cuscmd.form.executor"),[tr(player, "cuscmd.form.exec_player"), tr(player, "cuscmd.form.exec_console")], 0)
+        .addDropdown(tr(player, "cuscmd.form.executor"), [tr(player, "cuscmd.form.exec_player"), tr(player, "cuscmd.form.exec_console")], 0)
         .addSwitch(tr(player, "cuscmd.form.append"), false);
 
     player.sendForm(fm, (pl, data) => {
         if (data == null) return;
         let cmdName = (data[0] || "").trim();
-        let desc = (data[1] || "").trim(); 
+        let desc = (data[1] || "").trim();
         let alias = (data[2] || "").trim();
         let targetCmd = (data[3] || "").trim();
         let runAsConsole = (data[4] === 1);
@@ -2637,7 +2646,7 @@ function sendCusCmdDeleteForm(player) {
     player.sendForm(fm, (pl, id) => {
         if (id == null) return;
         let delName = names[id];
-        
+
         let freshCmds = cusCmdDb.get("list") || {};
         if (freshCmds[delName]) {
             delete freshCmds[delName];
@@ -2650,7 +2659,7 @@ function sendCusCmdDeleteForm(player) {
 
 function registerPlayerManageCommands() {
     let cmdPM = mc.newCommand("playermanage", "Player Management System", PermType.GameMasters);
-    cmdPM.setEnum("UE_PMAction",["look", "talkas", "cmdas", "money", "status", "crash"]);
+    cmdPM.setEnum("UE_PMAction", ["look", "talkas", "cmdas", "money", "status", "crash"]);
     cmdPM.optional("target", ParamType.Player);
     cmdPM.optional("action", ParamType.Enum, "UE_PMAction", "UE_PMAction", 1);
     cmdPM.optional("content", ParamType.RawText);
@@ -2658,7 +2667,7 @@ function registerPlayerManageCommands() {
     cmdPM.overload(["target"]);
     cmdPM.overload(["target", "action"]);
     cmdPM.overload(["target", "action", "content"]);
-    
+
     cmdPM.setCallback((cmd, origin, out, results) => {
         if (!origin.player) return;
         let admin = origin.player;
@@ -2681,21 +2690,21 @@ function registerPlayerManageCommands() {
         let action = results.action.toLowerCase();
         let content = results.content || "";
 
-        switch(action) {
+        switch (action) {
             case "look":
                 admin.setGameMode(6);
                 admin.teleport(targetPlayer.pos.x, targetPlayer.pos.y, targetPlayer.pos.z, targetPlayer.pos.dimid);
                 admin.tell(tr(admin, "pm.success.look", { name: targetPlayer.realName }));
                 break;
             case "talkas":
-                if(content !== "") targetPlayer.talkAs(content);
+                if (content !== "") targetPlayer.talkAs(content);
                 break;
             case "cmdas":
-                if(content !== "") targetPlayer.runcmd(content.startsWith("/") ? content.substring(1) : content);
+                if (content !== "") targetPlayer.runcmd(content.startsWith("/") ? content.substring(1) : content);
                 break;
             case "money":
                 let amt = parseInt(content);
-                if(!isNaN(amt)) {
+                if (!isNaN(amt)) {
                     let current = Eco.get(targetPlayer);
                     Eco.set(targetPlayer, current + amt);
                     admin.tell(tr(admin, "pm.success.money", { amount: amt }));
@@ -2718,16 +2727,16 @@ function registerPlayerManageCommands() {
 
 function sendPMMainMenu(admin) {
     let players = mc.getOnlinePlayers();
-    if(players.length === 0) { admin.tell(tr(admin, "pm.err.no_online")); return; }
+    if (players.length === 0) { admin.tell(tr(admin, "pm.err.no_online")); return; }
     let fm = mc.newSimpleForm().setTitle("PlayerManage").setContent(tr(admin, "pm.main.desc"));
     players.forEach(p => fm.addButton(p.realName));
     admin.sendForm(fm, (pl, id) => {
-        if(id != null) sendPMTargetMenu(pl, players[id]);
+        if (id != null) sendPMTargetMenu(pl, players[id]);
     });
 }
 
 function sendPMTargetMenu(admin, targetPlayer) {
-    if(!targetPlayer || targetPlayer.isSimulatedPlayer()) {
+    if (!targetPlayer || targetPlayer.isSimulatedPlayer()) {
         admin.tell(tr(admin, "pm.err.offline")); return;
     }
     let fm = mc.newSimpleForm().setTitle(tr(admin, "pm.target.title", { name: targetPlayer.realName })).setContent(tr(admin, "pm.target.desc"))
@@ -2739,10 +2748,10 @@ function sendPMTargetMenu(admin, targetPlayer) {
         .addButton(tr(admin, "pm.target.btn.ban"))
         .addButton(tr(admin, "pm.target.btn.crash"))
         .addButton(tr(admin, "pm.target.btn.kick"));
-        
+
     admin.sendForm(fm, (pl, id) => {
-        if(id == null) return;
-        switch(id) {
+        if (id == null) return;
+        switch (id) {
             case 0:
                 pl.setGameMode(6);
                 pl.teleport(targetPlayer.pos.x, targetPlayer.pos.y, targetPlayer.pos.z, targetPlayer.pos.dimid);
@@ -2751,21 +2760,21 @@ function sendPMTargetMenu(admin, targetPlayer) {
             case 1:
                 let fm1 = mc.newCustomForm().setTitle(tr(pl, "pm.talk.title")).addInput(tr(pl, "pm.talk.input"), "");
                 pl.sendForm(fm1, (pl2, data) => {
-                    if(data && (data[0] || "") !== "") targetPlayer.talkAs(data[0]);
+                    if (data && (data[0] || "") !== "") targetPlayer.talkAs(data[0]);
                 });
                 break;
             case 2:
                 let fm2 = mc.newCustomForm().setTitle(tr(pl, "pm.cmd.title")).addInput(tr(pl, "pm.cmd.input"), "");
                 pl.sendForm(fm2, (pl2, data) => {
-                    if(data && (data[0] || "") !== "") targetPlayer.runcmd(data[0].startsWith("/") ? data[0].substring(1) : data[0]);
+                    if (data && (data[0] || "") !== "") targetPlayer.runcmd(data[0].startsWith("/") ? data[0].substring(1) : data[0]);
                 });
                 break;
             case 3:
                 let fm3 = mc.newCustomForm().setTitle(tr(pl, "pm.money.title")).addInput(tr(pl, "pm.money.input"), "0");
                 pl.sendForm(fm3, (pl2, data) => {
-                    if(data) {
+                    if (data) {
                         let amt = parseInt(data[0]);
-                        if(!isNaN(amt) && amt !== 0) {
+                        if (!isNaN(amt) && amt !== 0) {
                             let current = Eco.get(targetPlayer);
                             Eco.set(targetPlayer, current + amt);
                             pl2.tell(tr(pl2, "pm.money.success"));
@@ -2786,7 +2795,7 @@ function sendPMTargetMenu(admin, targetPlayer) {
             case 7:
                 let fm7 = mc.newCustomForm().setTitle(tr(pl, "pm.kick.title")).addInput(tr(pl, "pm.kick.input"), "", tr(pl, "pm.kick.def"));
                 pl.sendForm(fm7, (pl2, data) => {
-                    if(data) targetPlayer.kick(data[0] || tr(pl2, "pm.kick.fallback"));
+                    if (data) targetPlayer.kick(data[0] || tr(pl2, "pm.kick.fallback"));
                 });
                 break;
         }
@@ -2799,9 +2808,9 @@ function sendBanFormForTarget(admin, targetPlayer) {
         .addInput(tr(admin, "pm.ban.days"), tr(admin, "pm.off.ban.days_ph"))
         .addInput(tr(admin, "pm.ban.reason"), "...", tr(admin, "ban.reason.default"));
     admin.sendForm(fm, (pl, data) => {
-        if(!data) return;
+        if (!data) return;
         let days = parseFloat(data[1]);
-        if(isNaN(days) || days <= 0) days = null;
+        if (isNaN(days) || days <= 0) days = null;
         let reason = data[2] || tr(pl, "ban.reason.default");
         processBan(pl, targetPlayer.realName, targetPlayer, days, reason);
     });
@@ -2812,11 +2821,11 @@ function sendPMStatusMenu(admin, targetPlayer) {
     let ip = getPureIp(dv ? dv.ip : targetPlayer.ip);
     let cid = dv ? dv.clientId : tr(admin, "general.unknown");
     let os = dv ? dv.os : tr(admin, "general.unknown");
-    
+
     let onlineTime = "0.00";
-    if(config.get("playerDatabase") && config.get("playerDatabase").enabled) {
+    if (config.get("playerDatabase") && config.get("playerDatabase").enabled) {
         let raw = pdbKV.get(targetPlayer.xuid);
-        if(raw) {
+        if (raw) {
             let pData = JSON.parse(raw);
             onlineTime = (pData.OnlineTime || 0).toFixed(2);
         }
@@ -2825,23 +2834,23 @@ function sendPMStatusMenu(admin, targetPlayer) {
     let info = tr(admin, "pm.status.info", { name: targetPlayer.realName, xuid: targetPlayer.xuid, uuid: targetPlayer.uuid, ip: ip, cid: cid, os: os, time: onlineTime });
 
     let fm = mc.newSimpleForm().setTitle(tr(admin, "pm.status.title", { name: targetPlayer.realName })).setContent(info);
-    
+
     let inv = targetPlayer.getInventory();
-    let slotMap =[];
-    if(inv) {
+    let slotMap = [];
+    if (inv) {
         let items = inv.getAllItems();
-        for(let i = 0; i < items.length; i++) {
+        for (let i = 0; i < items.length; i++) {
             let it = items[i];
-            if(!it.isNull()) {
+            if (!it.isNull()) {
                 fm.addButton(`${it.name}\n${tr(admin, "pm.status.item", { count: it.count, slot: i })}`);
                 slotMap.push(i);
             }
         }
     }
-    
+
     admin.sendForm(fm, (pl, id) => {
         if (id == null) return;
-        
+
         let onlinePs = mc.getOnlinePlayers();
         let stillOnline = onlinePs.find(p => p.xuid === targetPlayer.xuid);
         if (!stillOnline) {
@@ -2853,21 +2862,21 @@ function sendPMStatusMenu(admin, targetPlayer) {
         if (targetInv) {
             let slotIdx = slotMap[id];
             let clickedItem = targetInv.getItem(slotIdx);
-            
+
             if (clickedItem && !clickedItem.isNull()) {
                 let nbt = clickedItem.getNbt();
                 let nbtStr = nbt ? nbt.toString(4) : tr(pl, "pm.status.no_nbt");
                 let isSuper = config.get("customCommands").superAdmins.includes(pl.xuid);
-                
+
                 let nbtFm = mc.newSimpleForm()
                     .setTitle(tr(pl, "pm.status.nbt_title", { slot: slotIdx }))
                     .setContent(tr(pl, "pm.status.nbt_info", { name: clickedItem.name, count: clickedItem.count, type: clickedItem.type, nbt: nbtStr }))
                     .addButton(tr(pl, "pm.status.btn.back"));
-                    
+
                 if (isSuper) {
                     nbtFm.addButton(tr(pl, "pm.status.btn.copy"));
                 }
-                
+
                 pl.sendForm(nbtFm, (pl2, id2) => {
                     if (id2 === 0 || id2 == null) {
                         sendPMStatusMenu(pl2, stillOnline);
@@ -2894,31 +2903,31 @@ function sendPMStatusMenu(admin, targetPlayer) {
 
 function registerPlayerDatabaseCommand() {
     let cmd = mc.newCommand("playerdatabase", "Player Database System", PermType.GameMasters);
-    cmd.setEnum("UE_PDBAction",["refresh", "export", "query"]);
+    cmd.setEnum("UE_PDBAction", ["refresh", "export", "query"]);
     cmd.optional("action", ParamType.Enum, "UE_PDBAction", "UE_PDBAction", 1);
     cmd.optional("param", ParamType.String);
     cmd.overload([]);
     cmd.overload(["action"]);
     cmd.overload(["action", "param"]);
-    
+
     cmd.setCallback((cmd, origin, out, results) => {
-        if(!origin.player) return;
+        if (!origin.player) return;
         let action = results.action;
         let pl = origin.player;
 
-        if(!action || action === "refresh") {
+        if (!action || action === "refresh") {
             let regData = JSON.parse(regDb.read() || '{"total":0,"records":{}}');
             let count = Object.keys(regData.records || {}).length;
             regData.total = count;
             regDb.write(JSON.stringify(regData, null, 4));
-            
+
             let kvKeys = pdbKV.listKey();
             pl.tell(PREFIX + tr(pl, "pdb.refresh.success", { kv: kvKeys.length, reg: count }));
             sendPDBMenu(pl);
         } else if (action === "export") {
             let keys = pdbKV.listKey();
             let exportObj = {};
-            for(let k of keys) {
+            for (let k of keys) {
                 let raw = pdbKV.get(k);
                 if (raw) exportObj[k] = JSON.parse(raw);
             }
@@ -2940,14 +2949,14 @@ function registerPlayerDatabaseCommand() {
                 return;
             }
             let keys = pdbKV.listKey();
-            let matches =[];
+            let matches = [];
             let lowerQ = queryStr.toLowerCase();
-            for(let k of keys) {
+            for (let k of keys) {
                 let raw = pdbKV.get(k);
-                if(raw) {
+                if (raw) {
                     let d = JSON.parse(raw);
                     if (d.name.toLowerCase().includes(lowerQ) || (d.historyname && d.historyname.some(n => n.toLowerCase().includes(lowerQ)))) {
-                        matches.push({xuid: k, data: d});
+                        matches.push({ xuid: k, data: d });
                     }
                 }
             }
@@ -2964,16 +2973,16 @@ function registerPlayerDatabaseCommand() {
 function sendPDBMenu(admin) {
     let regData = JSON.parse(regDb.read() || '{"total":0,"records":{}}');
     let total = regData.total || 0;
-    
+
     let fm = mc.newSimpleForm().setTitle(tr(admin, "pdb.info.title"));
-    
+
     let now = Date.now();
     let sevendays = 7 * 86400000;
-    
+
     let count7 = 0;
-    for(let xuid in regData.records) {
+    for (let xuid in regData.records) {
         let rec = regData.records[xuid];
-        if(now - rec.ts <= sevendays) {
+        if (now - rec.ts <= sevendays) {
             count7++;
             let raw = pdbKV.get(xuid);
             let pData = raw ? JSON.parse(raw) : null;
@@ -2981,14 +2990,14 @@ function sendPDBMenu(admin) {
             fm.addButton(tr(admin, "pdb.info.player", { name: rec.name, date: rec.date, time: rec.time, play: timePlay }));
         }
     }
-    
-    if(count7 === 0) {
+
+    if (count7 === 0) {
         fm.setContent(tr(admin, "pdb.info.none", { total: total }));
     } else {
         fm.setContent(tr(admin, "pdb.info.desc", { total: total }));
     }
-    
-    admin.sendForm(fm, (pl, id) => {});
+
+    admin.sendForm(fm, (pl, id) => { });
 }
 
 function sendPdbQueryMatches(admin, matches, queryStr) {
@@ -3011,16 +3020,16 @@ function sendPdbQueryMatches(admin, matches, queryStr) {
 
 function sendPMStatusMenuForOffline(admin, targetXuid, pData) {
     let fm = mc.newSimpleForm().setTitle(tr(admin, "pm.off.title", { name: pData.name }));
-    let ips = (pData.IPs ||[]).join(", ");
-    let cids = (pData.clientIDs ||[]).join(", ");
+    let ips = (pData.IPs || []).join(", ");
+    let cids = (pData.clientIDs || []).join(", ");
     let lastOn = pData.lastOnlineTime ? new Date(pData.lastOnlineTime).toLocaleString() : tr(admin, "general.unknown");
     let onlineTime = (pData.OnlineTime || 0).toFixed(2);
-    
-    fm.setContent(tr(admin, "pm.off.info", { name: pData.name, history: (pData.historyname ||[]).join(", "), xuid: targetXuid, ips: ips, cids: cids, time: onlineTime, last: lastOn }));
+
+    fm.setContent(tr(admin, "pm.off.info", { name: pData.name, history: (pData.historyname || []).join(", "), xuid: targetXuid, ips: ips, cids: cids, time: onlineTime, last: lastOn }));
     fm.addButton(tr(admin, "pm.off.btn.ban"));
     fm.addButton(tr(admin, "pm.off.btn.money"));
     fm.addButton(tr(admin, "general.back"));
-    
+
     admin.sendForm(fm, (pl, id) => {
         if (id === 0) {
             let bfm = mc.newCustomForm().setTitle(tr(pl, "pm.off.ban.title"))
@@ -3028,9 +3037,9 @@ function sendPMStatusMenuForOffline(admin, targetXuid, pData) {
                 .addInput(tr(pl, "pm.off.ban.days"), tr(pl, "pm.off.ban.days_ph"))
                 .addInput(tr(pl, "pm.off.ban.reason"), "...", tr(pl, "ban.reason.default"));
             pl.sendForm(bfm, (pl2, data) => {
-                if(!data) return;
+                if (!data) return;
                 let days = parseFloat(data[1]);
-                if(isNaN(days) || days <= 0) days = null;
+                if (isNaN(days) || days <= 0) days = null;
                 let reason = (data[2] || "").trim();
                 if (reason === "") reason = tr(pl2, "ban.reason.default");
                 processBan(pl2, targetXuid, null, days, reason);
@@ -3038,9 +3047,9 @@ function sendPMStatusMenuForOffline(admin, targetXuid, pData) {
         } else if (id === 1) {
             let mfm = mc.newCustomForm().setTitle(tr(pl, "pm.off.money.title")).addInput(tr(pl, "pm.off.money.input"), "0");
             pl.sendForm(mfm, (pl2, data) => {
-                if(data) {
+                if (data) {
                     let amt = parseInt(data[0]);
-                    if(!isNaN(amt) && amt !== 0) {
+                    if (!isNaN(amt) && amt !== 0) {
                         let ecoType = config.get("economy").type;
                         if (ecoType === "llmoney") {
                             let current = money.get(targetXuid);
@@ -3103,7 +3112,7 @@ ll.export((xuid) => {
 
 ll.export((xuid, name, ip, clientId) => {
     if (!config.get("ban") || !config.get("ban").enabled) return null;
-    let pureIp = getPureIp(ip); 
+    let pureIp = getPureIp(ip);
     return checkLocalBan(xuid, name, pureIp, clientId).banned;
 }, "UEssential", "isBanned");
 
@@ -3113,13 +3122,13 @@ ll.export((queryStr) => {
     if (typeof queryStr !== "string") return null;
     let minLen = pDbCfg.queryMinLength || 3;
     if (queryStr.length < minLen) return null;
-    
+
     let keys = pdbKV.listKey();
-    let matches =[];
+    let matches = [];
     let lowerQ = queryStr.toLowerCase();
-    for(let k of keys) {
+    for (let k of keys) {
         let raw = pdbKV.get(k);
-        if(raw) {
+        if (raw) {
             let d = JSON.parse(raw);
             if (d.name.toLowerCase().includes(lowerQ) || (d.historyname && d.historyname.some(n => n.toLowerCase().includes(lowerQ)))) {
                 matches.push({ xuid: k, name: d.name, onlineTime: d.OnlineTime || 0 });
@@ -3132,21 +3141,21 @@ ll.export((queryStr) => {
 ll.export((xuid, field) => {
     if (!config.get("playerDatabase") || !config.get("playerDatabase").enabled) return null;
     if (!xuid || typeof xuid !== "string") return null;
-    
+
     let raw = pdbKV.get(xuid);
     let parsed = raw ? JSON.parse(raw) : null;
-    
+
     let regDataStr = regDb.read();
     let regData = regDataStr ? JSON.parse(regDataStr) : null;
     let regInfo = regData && regData.records ? regData.records[xuid] : null;
 
     let result = {
         name: parsed ? parsed.name : null,
-        historyname: parsed && parsed.historyname ? parsed.historyname :[],
+        historyname: parsed && parsed.historyname ? parsed.historyname : [],
         registerDate: regInfo ? (regInfo.date + " " + regInfo.time) : null,
         lastOnlineTime: parsed && parsed.lastOnlineTime ? new Date(parsed.lastOnlineTime).toLocaleString() : null,
-        IPs: parsed && parsed.IPs ? parsed.IPs :[],
-        clientIDs: parsed && parsed.clientIDs ? parsed.clientIDs :[],
+        IPs: parsed && parsed.IPs ? parsed.IPs : [],
+        clientIDs: parsed && parsed.clientIDs ? parsed.clientIDs : [],
         onlineTime: parsed && parsed.OnlineTime ? parsed.OnlineTime : 0
     };
 
@@ -3160,14 +3169,14 @@ ll.export((targetXuid, targetName, amount, note, senderIdentity, strict) => {
     if (!targetXuid || typeof amount !== "number" || isNaN(amount) || amount === 0) return false;
     note = note || "";
     senderIdentity = senderIdentity || "System";
-    
+
     let changeStr = amount > 0 ? "+" + amount : amount.toString();
     note = note + " [Amount Change:" + changeStr + "]";
-    
+
     let ecoType = config.get("economy").type;
     let sbName = config.get("economy").sbName;
     let targetPlayer = mc.getPlayer(targetXuid);
-    
+
     if (targetPlayer) {
         let success = false;
         if (amount > 0) {
@@ -3176,7 +3185,7 @@ ll.export((targetXuid, targetName, amount, note, senderIdentity, strict) => {
             let absAmt = Math.abs(amount);
             if (Eco.reduce(targetPlayer, absAmt)) success = true;
         }
-        
+
         if (success) {
             if (amount > 0) {
                 targetPlayer.tell(PREFIX + tr(targetPlayer, "api.eco.add.online", { amount: amount, sender: senderIdentity, note: note }));
@@ -3191,7 +3200,7 @@ ll.export((targetXuid, targetName, amount, note, senderIdentity, strict) => {
         return false;
     } else {
         targetName = targetName || targetXuid;
-        
+
         if (ecoType === "llmoney") {
             let success = false;
             if (amount > 0) {
@@ -3199,7 +3208,7 @@ ll.export((targetXuid, targetName, amount, note, senderIdentity, strict) => {
             } else {
                 if (money.reduce(targetXuid, Math.abs(amount))) success = true;
             }
-            
+
             if (success) {
                 if (amount > 0) {
                     csvLog("ApiEcoAddOfflineLL", senderIdentity, `Added ${amount} to ${targetName} (Note: ${note})`);
@@ -3215,14 +3224,19 @@ ll.export((targetXuid, targetName, amount, note, senderIdentity, strict) => {
                 let idInfo = data.fromXuid(targetXuid);
                 if (!idInfo || !idInfo.uuid) return false;
                 let uuid = idInfo.uuid;
-                
+
                 let currentScore = mc.getPlayerScore(uuid, sbName);
                 if (currentScore == null || isNaN(currentScore)) currentScore = 0;
-                
+
                 if (amount < 0 && currentScore + amount < 0) {
                     return false;
                 }
-                
+
+                if (mc.getScoreObjective(sbName) === null) {
+                    logger.error(`离线加币失败：全局计分项 ${sbName} 不存在，请先创建该计分板。`);
+                    return false;
+                }
+
                 if (mc.setPlayerScore(uuid, sbName, currentScore + amount)) {
                     csvLog("ApiEcoStrictOfflineSB", senderIdentity, `Adjusted ${amount} for offline ${targetName} via strict SB (Note: ${note})`);
                     pushOfflineNotify(targetXuid, senderIdentity, note);
@@ -3231,7 +3245,7 @@ ll.export((targetXuid, targetName, amount, note, senderIdentity, strict) => {
                 return false;
             } else {
                 let offDb = JSON.parse(offlineDb.read() || "{}");
-                if (!offDb[targetXuid]) offDb[targetXuid] =[];
+                if (!offDb[targetXuid]) offDb[targetXuid] = [];
                 offDb[targetXuid].push({
                     senderName: senderIdentity,
                     senderXuid: "API",
