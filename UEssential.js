@@ -1,20 +1,5 @@
-/*-----------------------------------------------------------------------
- UEssential 基础插件
- Copyright (c) 2024-2026 wuw111. All rights reserved.
-
- [授权声明]
- 本项目基于 CASAL v1.0 协议授权。官方发布渠道仅限 GitHub、KLPBBS、MineBBS，禁止未经许可的转载。
- 运行环境：本插件仅限服务端运行，严禁将本体代码或逻辑分发至客户端（如JS源码内容等）。
- 允许二次开发，但在公网服务器运行修改版时，必须公开完整源码并沿用CASAL 协议。
- 商业：允许商业服务器部署使用。但【严禁】直接售卖插件、将其加入付费整合包，或在商业服务器内将插件内功能设为“付费解锁”。
- 详细条款、例外情况及授权定义请参阅项目根目录下的 LICENSE 文件。
- 温馨提示：本插件永久免费。若您为下载插件文件或为了解锁其内部功能而付费，说明您已被骗，请立即举报。
-
- 项目地址：https://github.com/wuw111/UEssential
- -----------------------------------------------------------------------*/
-
 const PLUGIN_NAME = "UEssential";
-const VERSION = [1, 2, 6];
+const VERSION = [1, 2, 7];
 const PREFIX = "§b§l[UEssential]§r ";
 const DIR_PATH = "plugins/" + PLUGIN_NAME;
 const LANG_PATH = DIR_PATH + "/lang";
@@ -591,6 +576,11 @@ function getPureIp(ipStr) {
     return ipStr.split(':')[0];
 }
 
+function isLocalIp(ipStr) {
+    if (!ipStr) return false;
+    return /^(127\.0\.0\.1|::1|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|172\.(1[6-9]|2[0-9]|3[0-1])\.\d+\.\d+)$/.test(ipStr);
+}
+
 const Util = {
     getTodayStr: function () {
         let tm = system.getTimeObj();
@@ -797,10 +787,34 @@ mc.listen("onPlayerDie", (player, source) => {
 mc.listen("onPreJoin", (player) => {
     if (config.get("ban").enabled) {
         logger.info(`开始进行 ${player.name} 本地黑名单检查 (PreJoin)`);
-        let res = checkLocalBan(player.xuid, player.name, getPureIp(player.ip), null);
+        let ip = getPureIp(player.ip);
+        let res = checkLocalBan(player.xuid, player.name, ip, null);
+
         if (res.banned) {
             logger.info(`${player.name} 本地黑名单检查不通过: ${res.reason}`);
             csvLog("BanCheck", "System", `${player.name} failed local ban check: ${res.reason}`);
+
+            if (config.get("playerDatabase") && config.get("playerDatabase").enabled) {
+                let raw = pdbKV.get(player.xuid);
+                if (raw) {
+                    let pData = JSON.parse(raw);
+                    let modified = false;
+
+                    if (pData.name !== player.name) {
+                        if (!pData.historyname) pData.historyname = [];
+                        if (!pData.historyname.includes(pData.name)) pData.historyname.push(pData.name);
+                        pData.name = player.name;
+                        modified = true;
+                    }
+                    if (ip && (typeof isLocalIp === 'undefined' || !isLocalIp(ip)) && (!pData.IPs || !pData.IPs.includes(ip))) {
+                        if (!pData.IPs) pData.IPs = [];
+                        pData.IPs.push(ip);
+                        modified = true;
+                    }
+                    if (modified) pdbKV.set(player.xuid, JSON.stringify(pData));
+                }
+            }
+
             player.kick(tr(player, "ban.kick.local", { reason: res.reason }));
             return false;
         } else {
@@ -813,42 +827,14 @@ mc.listen("onPreJoin", (player) => {
 mc.listen("onJoin", (player) => {
     if (player.isSimulatedPlayer()) return;
 
-    if (config.get("ban").enabled) {
-        let dv = player.getDevice();
-        let clientId = dv ? dv.clientId : null;
-        let ip = getPureIp(dv ? dv.ip : player.ip);
-
-        logger.info(`开始进行 ${player.realName} 本地深度黑名单检查`);
-        let res = checkLocalBan(player.xuid, player.realName, ip, clientId);
-        if (res.banned) {
-            logger.info(`${player.realName} 本地深度黑名单检查不通过: ${res.reason}`);
-            csvLog("BanCheck", "System", `${player.realName} failed local deep ban check: ${res.reason}`);
-            player.kick(tr(player, "ban.kick.local", { reason: res.reason }));
-            return;
-        } else {
-            logger.info(`${player.realName} 本地深度黑名单检查通过`);
-            csvLog("BanCheck", "System", `${player.realName} passed local deep ban check`);
-        }
-
-        checkCloudBan(player.xuid, player.realName, ip, clientId, (banned, reason) => {
-            if (banned) {
-                let p = mc.getPlayer(player.xuid);
-                if (p) p.kick(tr(p, "ban.kick.cloud", { reason: reason }));
-
-                if (config.get("ban").cloudRecordToLocal) {
-                    addLocalBan({ xuid: player.xuid, name: player.realName, ip: ip, clientId: clientId }, "Cloud Ban: " + reason, null);
-                }
-            }
-        });
-    }
+    let dv = player.getDevice();
+    let clientId = dv ? dv.clientId : null;
+    let ip = getPureIp(dv ? dv.ip : player.ip);
 
     if (config.get("playerDatabase") && config.get("playerDatabase").enabled) {
         let xuid = player.xuid;
         let rawPData = pdbKV.get(xuid);
         let pData = rawPData ? JSON.parse(rawPData) : null;
-        let dv = player.getDevice();
-        let ip = getPureIp(dv ? dv.ip : player.ip);
-        let cid = dv ? dv.clientId : null;
         let realName = player.realName;
 
         let isNew = false;
@@ -875,8 +861,8 @@ mc.listen("onJoin", (player) => {
             }
         }
 
-        if (ip && !pData.IPs.includes(ip)) pData.IPs.push(ip);
-        if (cid && !pData.clientIDs.includes(cid)) pData.clientIDs.push(cid);
+        if (ip && (typeof isLocalIp === 'undefined' || !isLocalIp(ip)) && !pData.IPs.includes(ip)) pData.IPs.push(ip);
+        if (clientId && !pData.clientIDs.includes(clientId)) pData.clientIDs.push(clientId);
 
         pdbKV.set(xuid, JSON.stringify(pData));
 
@@ -895,6 +881,31 @@ mc.listen("onJoin", (player) => {
             };
             regDb.write(JSON.stringify(regData, null, 4));
         }
+    }
+
+    if (config.get("ban").enabled) {
+        logger.info(`开始进行 ${player.realName} 本地深度黑名单检查`);
+        let res = checkLocalBan(player.xuid, player.realName, ip, clientId);
+        if (res.banned) {
+            logger.info(`${player.realName} 本地深度黑名单检查不通过: ${res.reason}`);
+            csvLog("BanCheck", "System", `${player.realName} failed local deep ban check: ${res.reason}`);
+            player.kick(tr(player, "ban.kick.local", { reason: res.reason }));
+            return;
+        } else {
+            logger.info(`${player.realName} 本地深度黑名单检查通过`);
+            csvLog("BanCheck", "System", `${player.realName} passed local deep ban check`);
+        }
+
+        checkCloudBan(player.xuid, player.realName, ip, clientId, (banned, reason) => {
+            if (banned) {
+                let p = mc.getPlayer(player.xuid);
+                if (p) p.kick(tr(p, "ban.kick.cloud", { reason: reason }));
+
+                if (config.get("ban").cloudRecordToLocal) {
+                    addLocalBan({ xuid: player.xuid, name: player.realName, ip: ip, clientId: clientId }, "Cloud Ban: " + reason, null);
+                }
+            }
+        });
     }
 
     let offTransfers = JSON.parse(offlineDb.read() || "{}");
@@ -1442,7 +1453,7 @@ function processBan(admin, targetStr, targetPlayer, days, reason) {
         info.name.push(targetPlayer.realName);
         let dv = targetPlayer.getDevice();
         let pip = getPureIp(dv ? dv.ip : targetPlayer.ip);
-        if (pip) info.ip.push(pip);
+        if (pip && !isLocalIp(pip)) info.ip.push(pip);
         if (dv && dv.clientId) info.clientId.push(dv.clientId);
     } else {
         if (/^\d{16}$/.test(targetStr)) info.xuid.push(targetStr);
@@ -1475,7 +1486,11 @@ function processBan(admin, targetStr, targetPlayer, days, reason) {
         if (pData) {
             if (pData.name && !info.name.includes(pData.name)) info.name.push(pData.name);
             if (pData.historyname) pData.historyname.forEach(n => { if (!info.name.includes(n)) info.name.push(n); });
-            if (pData.IPs) pData.IPs.forEach(ip => { if (!info.ip.includes(ip)) info.ip.push(ip); });
+            
+            if (pData.IPs) pData.IPs.forEach(ip => { 
+                if (!isLocalIp(ip) && !info.ip.includes(ip)) info.ip.push(ip); 
+            });
+            
             if (pData.clientIDs) pData.clientIDs.forEach(cid => { if (!info.clientId.includes(cid)) info.clientId.push(cid); });
         }
     }
@@ -3263,4 +3278,4 @@ ll.export((targetXuid, targetName, amount, note, senderIdentity, strict) => {
 
 
 logger.setTitle("UEssential");
-logger.info("UEssential " + VERSION.join(".") + " 加载成功！作者：wuw111。BUG反馈或功能建议请加入反馈群：1097933637。本插件为免费插件，如果您是花钱购买的，请投诉商家并且要求退款。");
+logger.info("UEssential " + VERSION.join(".") + " 加载成功！已全面强化跨插件API支持与离线经济事务控制列队支持。");
