@@ -1,5 +1,5 @@
 const PLUGIN_NAME = "UEssential";
-const VERSION = [1, 2, 7];
+const VERSION = [1, 2, 8];
 const PREFIX = "§b§l[UEssential]§r ";
 const DIR_PATH = "plugins/" + PLUGIN_NAME;
 const LANG_PATH = DIR_PATH + "/lang";
@@ -1312,15 +1312,19 @@ function checkLocalBan(xuid, name, ip, clientId) {
 function addLocalBan(info, reason, durationDays) {
     let bans = banDb.get("list") || [];
     let expire = durationDays ? Date.now() + durationDays * 86400000 : null;
+    
+    let cleanArray = (arr) => [...new Set(arr.filter(item => item !== null && item !== undefined && item !== ""))];
+
     let newBan = {
         id: system.randomGuid(),
-        xuids: Array.isArray(info.xuid) ? info.xuid : (info.xuid ? [info.xuid] : []),
-        names: Array.isArray(info.name) ? info.name : (info.name ? [info.name] : []),
-        ips: Array.isArray(info.ip) ? info.ip : (info.ip ? [info.ip] : []),
-        clientIds: Array.isArray(info.clientId) ? info.clientId : (info.clientId ? [info.clientId] : []),
+        xuids: cleanArray(Array.isArray(info.xuid) ? info.xuid : (info.xuid ? [info.xuid] : [])),
+        names: cleanArray(Array.isArray(info.name) ? info.name : (info.name ? [info.name] : [])),
+        ips: cleanArray(Array.isArray(info.ip) ? info.ip : (info.ip ? [info.ip] : [])),
+        clientIds: cleanArray(Array.isArray(info.clientId) ? info.clientId : (info.clientId ? [info.clientId] : [])),
         reason: reason || tr(null, "ban.reason.default"),
         expireTime: expire
     };
+    
     bans.push(newBan);
     bans = mergeBans(bans);
     banDb.set("list", bans);
@@ -1409,7 +1413,9 @@ function checkCloudBan(xuid, name, ip, clientId, callback) {
 
 function sendBanForm(admin) {
     let onlinePlayers = mc.getOnlinePlayers().filter(p => !p.isSimulatedPlayer());
-    let names = onlinePlayers.map(p => p.realName);
+    
+    let pList = onlinePlayers.map(p => ({ xuid: p.xuid, name: p.realName }));
+    let names = pList.map(p => p.name);
 
     let fm = mc.newCustomForm().setTitle(tr(admin, "ban.form.title"));
     fm.addDropdown(tr(admin, "ban.form.dropdown"), [tr(admin, "ban.form.dropdown.empty"), ...names], 0);
@@ -1425,8 +1431,9 @@ function sendBanForm(admin) {
         if (data[1] && data[1].trim() !== "") {
             targetStr = data[1].trim();
         } else if (data[0] > 0) {
-            targetPlayer = onlinePlayers[data[0] - 1];
-            targetStr = targetPlayer.realName;
+            let tXuid = pList[data[0] - 1].xuid;
+            targetPlayer = mc.getPlayer(tXuid);
+            targetStr = pList[data[0] - 1].name;
         } else {
             sendMsg(pl, "error.player_only");
             return;
@@ -2698,7 +2705,7 @@ function registerPlayerManageCommands() {
         let targetPlayer = results.target[0];
 
         if (!results.action) {
-            sendPMTargetMenu(admin, targetPlayer);
+            sendPMTargetMenu(admin, targetPlayer.xuid);
             return;
         }
 
@@ -2726,7 +2733,7 @@ function registerPlayerManageCommands() {
                 }
                 break;
             case "status":
-                sendPMStatusMenu(admin, targetPlayer);
+                sendPMStatusMenu(admin, targetPlayer.xuid);
                 break;
             case "crash":
                 targetPlayer.crash();
@@ -2741,20 +2748,26 @@ function registerPlayerManageCommands() {
 }
 
 function sendPMMainMenu(admin) {
-    let players = mc.getOnlinePlayers();
+    let players = mc.getOnlinePlayers().filter(p => !p.isSimulatedPlayer());
     if (players.length === 0) { admin.tell(tr(admin, "pm.err.no_online")); return; }
+    
+    let pList = players.map(p => ({ xuid: p.xuid, name: p.realName }));
     let fm = mc.newSimpleForm().setTitle("PlayerManage").setContent(tr(admin, "pm.main.desc"));
-    players.forEach(p => fm.addButton(p.realName));
+    pList.forEach(p => fm.addButton(p.name));
+    
     admin.sendForm(fm, (pl, id) => {
-        if (id != null) sendPMTargetMenu(pl, players[id]);
+        if (id != null) sendPMTargetMenu(pl, pList[id].xuid);
     });
 }
 
-function sendPMTargetMenu(admin, targetPlayer) {
+function sendPMTargetMenu(admin, targetXuid) {
+    let targetPlayer = mc.getPlayer(targetXuid);
     if (!targetPlayer || targetPlayer.isSimulatedPlayer()) {
         admin.tell(tr(admin, "pm.err.offline")); return;
     }
-    let fm = mc.newSimpleForm().setTitle(tr(admin, "pm.target.title", { name: targetPlayer.realName })).setContent(tr(admin, "pm.target.desc"))
+
+    let targetName = targetPlayer.realName;
+    let fm = mc.newSimpleForm().setTitle(tr(admin, "pm.target.title", { name: targetName })).setContent(tr(admin, "pm.target.desc"))
         .addButton(tr(admin, "pm.target.btn.look"))
         .addButton(tr(admin, "pm.target.btn.talk"))
         .addButton(tr(admin, "pm.target.btn.cmd"))
@@ -2766,72 +2779,99 @@ function sendPMTargetMenu(admin, targetPlayer) {
 
     admin.sendForm(fm, (pl, id) => {
         if (id == null) return;
+        
+        let freshTarget = mc.getPlayer(targetXuid);
+        if (!freshTarget && id !== 5) {
+            pl.tell(tr(pl, "pm.err.offline"));
+            return;
+        }
+
         switch (id) {
             case 0:
                 pl.setGameMode(6);
-                pl.teleport(targetPlayer.pos.x, targetPlayer.pos.y, targetPlayer.pos.z, targetPlayer.pos.dimid);
-                pl.tell(tr(pl, "pm.success.look", { name: targetPlayer.realName }));
+                pl.teleport(freshTarget.pos.x, freshTarget.pos.y, freshTarget.pos.z, freshTarget.pos.dimid);
+                pl.tell(tr(pl, "pm.success.look", { name: freshTarget.realName }));
                 break;
             case 1:
                 let fm1 = mc.newCustomForm().setTitle(tr(pl, "pm.talk.title")).addInput(tr(pl, "pm.talk.input"), "");
                 pl.sendForm(fm1, (pl2, data) => {
-                    if (data && (data[0] || "") !== "") targetPlayer.talkAs(data[0]);
+                    let t = mc.getPlayer(targetXuid);
+                    if (!t) { pl2.tell(tr(pl2, "pm.err.offline")); return; }
+                    if (data && (data[0] || "") !== "") t.talkAs(data[0]);
                 });
                 break;
             case 2:
                 let fm2 = mc.newCustomForm().setTitle(tr(pl, "pm.cmd.title")).addInput(tr(pl, "pm.cmd.input"), "");
                 pl.sendForm(fm2, (pl2, data) => {
-                    if (data && (data[0] || "") !== "") targetPlayer.runcmd(data[0].startsWith("/") ? data[0].substring(1) : data[0]);
+                    let t = mc.getPlayer(targetXuid);
+                    if (!t) { pl2.tell(tr(pl2, "pm.err.offline")); return; }
+                    if (data && (data[0] || "") !== "") t.runcmd(data[0].startsWith("/") ? data[0].substring(1) : data[0]);
                 });
                 break;
             case 3:
                 let fm3 = mc.newCustomForm().setTitle(tr(pl, "pm.money.title")).addInput(tr(pl, "pm.money.input"), "0");
                 pl.sendForm(fm3, (pl2, data) => {
+                    let t = mc.getPlayer(targetXuid);
+                    if (!t) { pl2.tell(tr(pl2, "pm.err.offline")); return; }
                     if (data) {
                         let amt = parseInt(data[0]);
                         if (!isNaN(amt) && amt !== 0) {
-                            let current = Eco.get(targetPlayer);
-                            Eco.set(targetPlayer, current + amt);
+                            let current = Eco.get(t);
+                            Eco.set(t, current + amt);
                             pl2.tell(tr(pl2, "pm.money.success"));
                         }
                     }
                 });
                 break;
             case 4:
-                sendPMStatusMenu(pl, targetPlayer);
+                sendPMStatusMenu(pl, targetXuid);
                 break;
             case 5:
-                sendBanFormForTarget(pl, targetPlayer);
+                sendBanFormForTarget(pl, targetXuid);
                 break;
             case 6:
-                targetPlayer.crash();
+                freshTarget.crash();
                 pl.tell(tr(pl, "pm.success.crash"));
                 break;
             case 7:
                 let fm7 = mc.newCustomForm().setTitle(tr(pl, "pm.kick.title")).addInput(tr(pl, "pm.kick.input"), "", tr(pl, "pm.kick.def"));
                 pl.sendForm(fm7, (pl2, data) => {
-                    if (data) targetPlayer.kick(data[0] || tr(pl2, "pm.kick.fallback"));
+                    let t = mc.getPlayer(targetXuid);
+                    if (!t) { pl2.tell(tr(pl2, "pm.err.offline")); return; }
+                    if (data) t.kick(data[0] || tr(pl2, "pm.kick.fallback"));
                 });
                 break;
         }
     });
 }
 
-function sendBanFormForTarget(admin, targetPlayer) {
+function sendBanFormForTarget(admin, targetXuid) {
+    let targetPlayer = mc.getPlayer(targetXuid);
+    let targetName = targetPlayer ? targetPlayer.realName : targetXuid;
+
     let fm = mc.newCustomForm().setTitle(tr(admin, "pm.ban.title"))
-        .addLabel(tr(admin, "pm.ban.label", { name: targetPlayer.realName, xuid: targetPlayer.xuid }))
+        .addLabel(tr(admin, "pm.ban.label", { name: targetName, xuid: targetXuid }))
         .addInput(tr(admin, "pm.ban.days"), tr(admin, "pm.off.ban.days_ph"))
         .addInput(tr(admin, "pm.ban.reason"), "...", tr(admin, "ban.reason.default"));
+        
     admin.sendForm(fm, (pl, data) => {
         if (!data) return;
         let days = parseFloat(data[1]);
         if (isNaN(days) || days <= 0) days = null;
         let reason = data[2] || tr(pl, "ban.reason.default");
-        processBan(pl, targetPlayer.realName, targetPlayer, days, reason);
+        
+        let freshTarget = mc.getPlayer(targetXuid);
+        processBan(pl, targetName, freshTarget, days, reason);
     });
 }
 
-function sendPMStatusMenu(admin, targetPlayer) {
+function sendPMStatusMenu(admin, targetXuid) {
+    let targetPlayer = mc.getPlayer(targetXuid);
+    if (!targetPlayer) {
+        admin.tell(tr(admin, "pm.err.offline"));
+        return;
+    }
+
     let dv = targetPlayer.getDevice();
     let ip = getPureIp(dv ? dv.ip : targetPlayer.ip);
     let cid = dv ? dv.clientId : tr(admin, "general.unknown");
@@ -2839,7 +2879,7 @@ function sendPMStatusMenu(admin, targetPlayer) {
 
     let onlineTime = "0.00";
     if (config.get("playerDatabase") && config.get("playerDatabase").enabled) {
-        let raw = pdbKV.get(targetPlayer.xuid);
+        let raw = pdbKV.get(targetXuid);
         if (raw) {
             let pData = JSON.parse(raw);
             onlineTime = (pData.OnlineTime || 0).toFixed(2);
@@ -2866,14 +2906,13 @@ function sendPMStatusMenu(admin, targetPlayer) {
     admin.sendForm(fm, (pl, id) => {
         if (id == null) return;
 
-        let onlinePs = mc.getOnlinePlayers();
-        let stillOnline = onlinePs.find(p => p.xuid === targetPlayer.xuid);
-        if (!stillOnline) {
+        let freshTarget = mc.getPlayer(targetXuid);
+        if (!freshTarget) {
             pl.tell(tr(pl, "pm.err.offline"));
             return;
         }
 
-        let targetInv = stillOnline.getInventory();
+        let targetInv = freshTarget.getInventory();
         if (targetInv) {
             let slotIdx = slotMap[id];
             let clickedItem = targetInv.getItem(slotIdx);
@@ -2894,23 +2933,31 @@ function sendPMStatusMenu(admin, targetPlayer) {
 
                 pl.sendForm(nbtFm, (pl2, id2) => {
                     if (id2 === 0 || id2 == null) {
-                        sendPMStatusMenu(pl2, stillOnline);
+                        sendPMStatusMenu(pl2, targetXuid);
                     } else if (isSuper && id2 === 1) {
-                        let cloneItem = clickedItem.clone();
-                        let adminInv = pl2.getInventory();
-                        if (adminInv && adminInv.hasRoomFor(cloneItem)) {
-                            adminInv.addItemToFirstEmptySlot(cloneItem);
-                            pl2.refreshItems();
-                            pl2.tell(PREFIX + tr(pl2, "pm.status.copy.success"));
+                        let curTarget = mc.getPlayer(targetXuid);
+                        let curInv = curTarget ? curTarget.getInventory() : null;
+                        let curItem = curInv ? curInv.getItem(slotIdx) : null;
+
+                        if (curItem && !curItem.isNull()) {
+                            let cloneItem = curItem.clone();
+                            let adminInv = pl2.getInventory();
+                            if (adminInv && adminInv.hasRoomFor(cloneItem)) {
+                                adminInv.addItemToFirstEmptySlot(cloneItem);
+                                pl2.refreshItems();
+                                pl2.tell(PREFIX + tr(pl2, "pm.status.copy.success"));
+                            } else {
+                                pl2.tell(PREFIX + tr(pl2, "pm.status.copy.fail"));
+                            }
                         } else {
-                            pl2.tell(PREFIX + tr(pl2, "pm.status.copy.fail"));
+                            pl2.tell(tr(pl2, "pm.status.item.empty"));
                         }
-                        sendPMStatusMenu(pl2, stillOnline);
+                        sendPMStatusMenu(pl2, targetXuid);
                     }
                 });
             } else {
                 pl.tell(tr(pl, "pm.status.item.empty"));
-                sendPMStatusMenu(pl, stillOnline);
+                sendPMStatusMenu(pl, targetXuid);
             }
         }
     });
@@ -3278,4 +3325,4 @@ ll.export((targetXuid, targetName, amount, note, senderIdentity, strict) => {
 
 
 logger.setTitle("UEssential");
-logger.info("UEssential " + VERSION.join(".") + " 加载成功！已全面强化跨插件API支持与离线经济事务控制列队支持。");
+logger.info("UEssential " + VERSION.join(".") + " 加载成功！作者：wuw111，插件反馈QQ群：1097933637");
