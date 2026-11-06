@@ -1,5 +1,16 @@
+/*-----------------------------------------------------------------------
+UEssential 基础生存插件 - v1.2.9
+Copyright (c) 2024-2026 wuw111. All rights reserved.
+[授权声明 - CASAL v1.0]
+本项目采用 Cloud-Aware Source-Available License v1.0（CASAL v1.0）授权，协议全文见同目录 LICENSE 文件。
+官方发布渠道仅限 GitHub、KLPBBS、MineBBS，禁止未经许可的转载。
+运行环境：本插件仅限服务端运行；未经书面许可，不得将本插件或其衍生作品分发至任何客户端设备。
+允许二次开发，但修改后的版本用于面向公众的服务器时，必须公开完整源码并继续沿用 CASAL v1.0 协议。
+商业使用：允许在商业服务器上部署使用；禁止售卖插件文件、将插件文件置于付费门槛之后，或把插件功能改为付费解锁。
+项目地址：https://github.com/wuw111/UEssential
+-----------------------------------------------------------------------*/
 const PLUGIN_NAME = "UEssential";
-const VERSION = [1, 2, 8];
+const VERSION = [1, 2, 9];
 const PREFIX = "§b§l[UEssential]§r ";
 const DIR_PATH = "plugins/" + PLUGIN_NAME;
 const LANG_PATH = DIR_PATH + "/lang";
@@ -21,7 +32,7 @@ const DEFAULT_CONFIG = {
         conditions: { enableLimits: true, targetMinMoney: 10000, senderMinMoney: 20000, sbName: "" }
     },
     tpr: {
-        enabled: true, cooldownSeconds: 30, maxAttempts: 10, loadDelayMs: 2000,
+        enabled: true, cooldownSeconds: 30, maxAttempts: 10, loadDelayMs: 2000, maxWaitSeconds: 60,
         costFormula: "50 * Math.pow(1.05, count)",
         dimensions: {
             "0": { enabled: true, rangeX: [-10000, 10000], rangeZ: [-10000, 10000], maxY: 300 },
@@ -42,7 +53,13 @@ const DEFAULT_CONFIG = {
     motd: { enabled: false, intervalSeconds: 5, list: ["§b欢迎来到服务器", "§a当前在线: {online}", "§e当前TPS: {tps}"] },
     customCommands: { enabled: true, superAdmins: ["9999999999999999"] },
     playerManage: { enabled: true },
-    playerDatabase: { enabled: true, autoBackup: true, backupIntervalDays: 1, queryMinLength: 3 }
+    playerDatabase: { enabled: true, autoBackup: true, backupIntervalDays: 1, queryMinLength: 3 },
+    webhub: {
+        enabled: true,
+        allowAdminActions: true,
+        cacheTtlMs: 5000,
+        auditTailDays: 3
+    }
 };
 
 const configPath = DIR_PATH + "/config.json";
@@ -134,6 +151,7 @@ const defaultLangData = {
         "tpr.searching": "正在寻找安全着陆点... (第 {attempt}/{max} 次尝试)",
         "tpr.success": "随机传送成功！已抵达 {x}, {y}, {z}。扣除费用：{cost} 金币。",
         "tpr.failed": "未能找到安全的随机传送点，已将您传回原处并全额退款。",
+        "tpr.timeout": "随机传送超时（目标区块一直未能加载），已将您传回原处并全额退款。",
 
         "tpa.disabled": "您已关闭TPA功能，无法发起请求。请先使用 /tpaset 开启。",
         "tpa.pending": "您有一个尚未处理的TPA请求，请等待过期或被处理后再发起！",
@@ -491,7 +509,7 @@ let currentTick = 0;
 let lastOnlineTimeCalcTimestamp = Date.now();
 let tpaQueue = {};
 let tprCooldowns = {};
-let activeTprPlayers = {};
+let activeTprs = {};
 
 const TPS_HISTORY_SIZE = 12000;
 let tickTimestamps = new Array(TPS_HISTORY_SIZE);
@@ -715,6 +733,86 @@ mc.listen("onTick", () => {
         }
     }
 
+    for (let xuid in activeTprs) {
+        let task = activeTprs[xuid];
+        let pl = mc.getPlayer(xuid);
+        if (!pl) {
+            delete activeTprs[xuid];
+            continue;
+        }
+
+        let cfg = config.get("tpr");
+        let dimCfg = cfg.dimensions[task.dimid.toString()];
+
+        task.ticks++;
+
+        if (task.ticks > cfg.maxWaitSeconds * 20) {
+            abortTpr(pl, task, "tpr.timeout");
+            csvLog("TPR", pl.realName, `TPR timeout after ${cfg.maxWaitSeconds}s, refunded`);
+            continue;
+        }
+
+        if (task.ticks % 100 === 0) pl.addEffect(27, 20 * cfg.maxWaitSeconds, 1, false);
+
+        if (task.ticks < Math.ceil(cfg.loadDelayMs / 50) || task.ticks % 10 !== 0) continue;
+
+        let x = task.targetX;
+        let z = task.targetZ;
+        let minY = (task.dimid === 0) ? -64 : 0;
+
+        let isFullyLoaded = true;
+        let safeY = -1;
+        let foundSolid = false;
+        let isSafe = false;
+        let airCount = 0;
+
+        for (let y = dimCfg.maxY; y >= minY; y--) {
+            let block = mc.getBlock(x, y, z, task.dimid);
+
+            if (!block) {
+                isFullyLoaded = false;
+                break;
+            }
+
+            if (block.isAir || isPassable(block)) {
+                airCount++;
+                continue;
+            }
+
+            foundSolid = true;
+
+            if (airCount >= 2) {
+                if (isSafeSurface(block)) {
+                    safeY = y;
+                    isSafe = true;
+                }
+                break;
+            }
+            airCount = 0;
+        }
+
+        if (!isFullyLoaded) continue;
+
+        if (foundSolid && isSafe) {
+            delete activeTprs[xuid];
+            pl.removeEffect(27);
+            pl.teleport(x + 0.5, safeY + 1, z + 0.5, task.dimid);
+            sendMsg(pl, "tpr.success", { x: x, y: safeY + 1, z: z, cost: task.cost });
+            csvLog("TPR", pl.realName, `TPR success to ${x}, ${safeY + 1}, ${z}`);
+        } else {
+            task.attempt++;
+            if (task.attempt > cfg.maxAttempts) {
+                abortTpr(pl, task, "tpr.failed");
+                csvLog("TPR", pl.realName, `TPR failed after ${cfg.maxAttempts} attempts, refunded`);
+            } else {
+                let next = pickTprTarget(dimCfg);
+                task.targetX = next.x;
+                task.targetZ = next.z;
+                launchTprFlight(pl, cfg, dimCfg);
+            }
+        }
+    }
+
     if (currentTick % 1200 === 0) {
         let pubContent = pubHomeDb.read();
         if (pubContent) {
@@ -774,6 +872,10 @@ mc.listen("onTick", () => {
 });
 
 mc.listen("onPlayerDie", (player, source) => {
+    if (activeTprs[player.xuid]) {
+        player.removeEffect(27);
+        delete activeTprs[player.xuid];
+    }
     if (player.isSimulatedPlayer() || !config.get("back").enabled) return;
     let pos = player.pos;
     let records = deathDb.get(player.xuid) || [];
@@ -949,7 +1051,7 @@ mc.listen("onJoin", (player) => {
 });
 
 mc.listen("onLeft", (player) => {
-    if (activeTprPlayers[player.xuid]) delete activeTprPlayers[player.xuid];
+    if (activeTprs[player.xuid]) delete activeTprs[player.xuid];
     if (player.isSimulatedPlayer() || !config.get("playerDatabase").enabled) return;
     let raw = pdbKV.get(player.xuid);
     if (raw) {
@@ -983,6 +1085,8 @@ mc.listen("onServerStarted", () => {
     }
 
     startDynamicMotd();
+
+    whStart();
 });
 
 function registerTprCommands() {
@@ -995,8 +1099,61 @@ function registerTprCommands() {
     cmdTpr.setup();
 }
 
+function isPassable(block) {
+    let t = block.type;
+    const passables = ["tallgrass", "double_plant", "yellow_flower", "red_flower", "snow_layer", "brown_mushroom", "red_mushroom", "deadbush", "fern", "vine", "waterlily", "torch", "sign", "lantern", "kelp", "seagrass"];
+    for (let p of passables) {
+        if (t.includes(p)) return true;
+    }
+    return false;
+}
+
+function isSafeSurface(block) {
+    let t = block.type;
+    const dangers = ["lava", "water", "fire", "magma", "powder_snow", "cactus", "sweet_berry_bush", "air", "void", "bedrock"];
+    for (let d of dangers) {
+        if (t.includes(d)) return false;
+    }
+    return true;
+}
+
+function pickTprTarget(dimCfg) {
+    return {
+        x: Math.floor(Math.random() * (dimCfg.rangeX[1] - dimCfg.rangeX[0] + 1)) + dimCfg.rangeX[0],
+        z: Math.floor(Math.random() * (dimCfg.rangeZ[1] - dimCfg.rangeZ[0] + 1)) + dimCfg.rangeZ[0]
+    };
+}
+
+function refundTpr(player, cost) {
+    if (cost <= 0) return;
+    Eco.add(player, cost);
+    let counts = dataDb.init("tprCounts", {});
+    let today = Util.getTodayStr();
+    if (counts[player.xuid] && counts[player.xuid].date === today && counts[player.xuid].count > 0) {
+        counts[player.xuid].count--;
+        dataDb.set("tprCounts", counts);
+    }
+}
+
+function abortTpr(player, task, msgKey) {
+    delete activeTprs[player.xuid];
+    player.removeEffect(27);
+    player.teleport(task.originalPos.x, task.originalPos.y, task.originalPos.z, task.originalPos.dimid);
+    refundTpr(player, task.cost);
+    sendMsg(player, msgKey);
+}
+
+function launchTprFlight(player, cfg, dimCfg) {
+    let task = activeTprs[player.xuid];
+    task.ticks = 0;
+    player.addEffect(27, 20 * cfg.maxWaitSeconds, 1, false);
+    player.teleport(task.targetX + 0.5, dimCfg.maxY, task.targetZ + 0.5, task.dimid);
+    player.refreshChunks();
+    sendMsg(player, "tpr.searching", { attempt: task.attempt, max: cfg.maxAttempts });
+}
+
 function processTpr(player) {
-    if (activeTprPlayers[player.xuid]) {
+    if (activeTprs[player.xuid]) {
         sendMsg(player, "tpr.already_searching");
         return;
     }
@@ -1024,112 +1181,20 @@ function processTpr(player) {
     tprCooldowns[player.xuid] = now;
     Util.addCount("tprCounts", player.xuid);
 
-    activeTprPlayers[player.xuid] = true;
-    let maxTotalTicks = Math.ceil((cfg.maxAttempts * cfg.loadDelayMs) / 1000 * 20) + 200;
-    player.addEffect(27, maxTotalTicks, 1, false);
-    player.addEffect(11, maxTotalTicks, 5, false);
+    let dimId = player.pos.dimid;
+    let target = pickTprTarget(dimCfg);
 
-    startTprSearch(player, cost, dimCfg, 0, player.pos, cfg);
-}
+    activeTprs[player.xuid] = {
+        originalPos: { x: player.pos.x, y: player.pos.y, z: player.pos.z, dimid: dimId },
+        dimid: dimId,
+        targetX: target.x,
+        targetZ: target.z,
+        attempt: 1,
+        ticks: 0,
+        cost: cost
+    };
 
-function isSafeBodySpace(block) {
-    if (!block || typeof block.type !== 'string') return false;
-    if (block.isAir) return true;
-    let t = block.type;
-    const passables = ["tallgrass", "double_plant", "yellow_flower", "red_flower", "snow_layer", "brown_mushroom", "red_mushroom", "deadbush", "fern", "vine", "waterlily", "torch", "sign", "lantern"];
-    for (let p of passables) {
-        if (t.includes(p)) return true;
-    }
-    return false;
-}
-
-function isDangerousSurface(block) {
-    if (!block || typeof block.type !== 'string') return true;
-    let t = block.type;
-    const dangers = ["lava", "water", "fire", "magma", "powder_snow", "cactus", "sweet_berry_bush", "air", "void", "bedrock"];
-    for (let d of dangers) {
-        if (t.includes(d)) return true;
-    }
-    return false;
-}
-
-function startTprSearch(player, cost, dimCfg, attempts, originalPos, cfg) {
-    if (attempts >= cfg.maxAttempts) {
-        delete activeTprPlayers[player.xuid];
-        player.removeEffect(27);
-        player.removeEffect(11);
-        player.teleport(originalPos.x, originalPos.y, originalPos.z, originalPos.dimid);
-        Eco.add(player, cost);
-
-        let counts = dataDb.init("tprCounts", {});
-        let today = Util.getTodayStr();
-        if (counts[player.xuid] && counts[player.xuid].date === today && counts[player.xuid].count > 0) {
-            counts[player.xuid].count--;
-            dataDb.set("tprCounts", counts);
-        }
-
-        sendMsg(player, "tpr.failed");
-        csvLog("TPR", player.realName, `TPR failed after ${cfg.maxAttempts} attempts, refunded`);
-        return;
-    }
-
-    let rx, rz;
-    if (attempts === 0) {
-        rx = Math.floor(Math.random() * (dimCfg.rangeX[1] - dimCfg.rangeX[0] + 1)) + dimCfg.rangeX[0];
-        rz = Math.floor(Math.random() * (dimCfg.rangeZ[1] - dimCfg.rangeZ[0] + 1)) + dimCfg.rangeZ[0];
-    } else {
-        rx = Math.floor(player.pos.x + (Math.random() * 100 - 50));
-        rz = Math.floor(player.pos.z + (Math.random() * 100 - 50));
-        rx = Math.max(dimCfg.rangeX[0], Math.min(dimCfg.rangeX[1], rx));
-        rz = Math.max(dimCfg.rangeZ[0], Math.min(dimCfg.rangeZ[1], rz));
-    }
-
-    let maxY = dimCfg.maxY;
-    let targetDim = originalPos.dimid;
-
-    player.teleport(rx, maxY, rz, targetDim);
-    player.refreshChunks();
-    sendMsg(player, "tpr.searching", { attempt: attempts + 1, max: cfg.maxAttempts });
-
-    setTimeout(() => {
-        let p = mc.getPlayer(player.xuid);
-        if (!p) {
-            delete activeTprPlayers[player.xuid];
-            return;
-        }
-
-        let found = false;
-        let safeY = maxY;
-
-        for (let y = maxY; y > 0; y--) {
-            let b1 = mc.getBlock(rx, y - 1, rz, targetDim);
-            let b2 = mc.getBlock(rx, y, rz, targetDim);
-            let b3 = mc.getBlock(rx, y + 1, rz, targetDim);
-
-            if (!b1 || !b2 || !b3) break;
-
-            if (!isSafeBodySpace(b1)) {
-                if (!isDangerousSurface(b1) && isSafeBodySpace(b2) && isSafeBodySpace(b3)) {
-                    found = true;
-                    safeY = y;
-                    break;
-                } else {
-                    break;
-                }
-            }
-        }
-
-        if (found) {
-            delete activeTprPlayers[p.xuid];
-            p.addEffect(27, 20 * 10, 1, false);
-            p.addEffect(11, 20 * 10, 5, false);
-            p.teleport(rx, safeY, rz, targetDim);
-            sendMsg(p, "tpr.success", { x: rx, y: safeY, z: rz, cost: cost });
-            csvLog("TPR", p.realName, `TPR success to ${rx}, ${safeY}, ${rz}`);
-        } else {
-            startTprSearch(p, cost, dimCfg, attempts + 1, originalPos, cfg);
-        }
-    }, cfg.loadDelayMs);
+    launchTprFlight(player, cfg, dimCfg);
 }
 
 
@@ -3325,4 +3390,1212 @@ ll.export((targetXuid, targetName, amount, note, senderIdentity, strict) => {
 
 
 logger.setTitle("UEssential");
-logger.info("UEssential " + VERSION.join(".") + " 加载成功！作者：wuw111，插件反馈QQ群：1097933637");
+logger.info("UEssential " + VERSION.join(".") + " 加载成功！已全面强化跨插件API支持与离线经济事务控制列队支持。");
+
+const WH_PLATFORM = "WebHub";
+const WH_NS = "UEssential";
+const WH_DISPATCH_EXPORT = "webhub.dispatch";
+const WH_RETRY_INTERVAL_MS = 3000;
+const WH_RETRY_LIMIT = 10;
+const WH_PLAYER_MAX_ROWS = 20;
+const WH_BAN_MAX_ROWS = 200;
+const WH_AUDIT_MAX_ROWS = 300;
+const WH_AUDIT_TAIL_BYTES = 2 * 1024 * 1024;
+const WH_DIM_NAMES = ["主世界", "下界", "末地"];
+
+let whRegistered = false;
+let whDispatchBound = false;
+let whRetryTimer = null;
+let whRetryCount = 0;
+
+let whCacheBans = { at: 0, data: null };
+let whCacheAudit = { key: "", rows: null, events: null };
+let whCachePlayers = { key: "", at: 0, data: null };
+let whPageCache = null;
+
+function whCfg() {
+    return config.get("webhub");
+}
+
+
+function whCall(name, ...args) {
+    if (!ll.hasExported(WH_PLATFORM, name)) return null;
+    return ll.imports(WH_PLATFORM, name)(...args);
+}
+
+
+function whStripColor(text) {
+    return String(text === null || text === undefined ? "" : text).replace(/§[0-9a-zA-Z]/g, "");
+}
+
+function whDimName(dimid) {
+    let idx = Number(dimid);
+    return WH_DIM_NAMES[idx] || ("维度 " + dimid);
+}
+
+function whFmtTime(ts) {
+    if (!ts) return null;
+    let t = new Date(ts);
+    let pad = (n) => (n < 10 ? "0" + n : "" + n);
+    return t.getFullYear() + "-" + pad(t.getMonth() + 1) + "-" + pad(t.getDate())
+        + " " + pad(t.getHours()) + ":" + pad(t.getMinutes());
+}
+
+function whMaskXuid(xuid) {
+    let s = String(xuid || "");
+    return s.length > 4 ? s.slice(0, 4) + "****" : "****";
+}
+
+function whMaskIp(ip) {
+    let parts = String(ip || "").split(".");
+    if (parts.length === 4) return parts[0] + "." + parts[1] + ".*.*";
+    let s = String(ip || "");
+    return s.length > 6 ? s.slice(0, 6) + "…" : "—";
+}
+
+function whMaskClient(id) {
+    let s = String(id || "");
+    return s.length > 4 ? s.slice(0, 4) + "…" : (s || "—");
+}
+
+function whCost(fn, ...args) {
+    let v = Math.floor(fn(...args));
+    if (isNaN(v) || v < 0) return 0;
+    return v;
+}
+
+function whPlayerData(xuid) {
+    let raw = pdbKV.get(xuid);
+    return raw ? JSON.parse(raw) : null;
+}
+
+function whBalance(xuid, player) {
+    let eco = config.get("economy");
+    if (eco.type === "llmoney") {
+        return Math.floor(money.get(xuid) || 0);
+    }
+    if (player) {
+        let score = player.getScore(eco.sbName);
+        return Math.floor((typeof score === "number" && !isNaN(score)) ? score : 0);
+    }
+    let idInfo = data.fromXuid(xuid);
+    if (!idInfo || !idInfo.uuid) return null;
+    let offlineScore = mc.getPlayerScore(idInfo.uuid, eco.sbName);
+    return Math.floor((offlineScore === null || isNaN(offlineScore)) ? 0 : offlineScore);
+}
+
+function whForbidden() {
+    return JSON.stringify({ status: 403, body: { error: "需要管理员权限" } });
+}
+
+
+function whQueryPublicHomes() {
+    let pubHomes = getPubHomes();
+    let now = Date.now();
+    let items = [];
+
+    for (let key in pubHomes) {
+        let home = pubHomes[key];
+        if (!home || typeof home.x !== "number") continue;
+        if (home.expireTime && home.expireTime <= now) continue;
+        items.push({
+            name: String(home.name || ""),
+            publisher: String(home.publisherName || ""),
+            dim: whDimName(home.dimid),
+            x: Math.round(home.x),
+            y: Math.round(home.y),
+            z: Math.round(home.z),
+            daysLeft: home.expireTime ? Math.ceil((home.expireTime - now) / 86400000) : null
+        });
+    }
+
+    items.sort(function (a, b) {
+        if (a.daysLeft === null && b.daysLeft === null) return a.name.localeCompare(b.name);
+        if (a.daysLeft === null) return 1;
+        if (b.daysLeft === null) return -1;
+        return a.daysLeft - b.daysLeft;
+    });
+
+    return { total: items.length, items: items };
+}
+
+function whQueryProfile(acc) {
+    let xuid = acc.xuid;
+    let pData = whPlayerData(xuid);
+    let records = regDb.get("records") || {};
+    let regRec = records[xuid] || null;
+    let homes = homeDb.get(xuid) || {};
+
+    let pubHomes = getPubHomes();
+    let published = 0;
+    for (let key in pubHomes) {
+        if (pubHomes[key] && pubHomes[key].publisherXuid === xuid) published++;
+    }
+
+    let eco = config.get("economy");
+    return {
+        name: pData ? pData.name : (acc.playerName || ""),
+        historyNames: (pData && pData.historyname) ? pData.historyname : [],
+        registerAt: regRec ? (regRec.date + " " + regRec.time) : null,
+        onlineMinutes: pData ? Math.round(pData.OnlineTime || 0) : 0,
+        lastOnlineAt: whFmtTime(pData ? pData.lastOnlineTime : null),
+        homeCount: Object.keys(homes).length,
+        publicHomeCount: published,
+        balance: whBalance(xuid, mc.getPlayer(xuid)),
+        economy: eco.type === "llmoney" ? "LLMoney" : ("计分板 " + eco.sbName)
+    };
+}
+
+function whQueryNotice(acc) {
+    let cfg = config.get("notice");
+    let res = { enabled: !!cfg.enabled, content: whStripColor(cfg.content || "") };
+    if (acc && acc.role === "admin") res.raw = cfg.content || "";
+    return res;
+}
+
+function whQueryPrices(acc) {
+    let xuid = acc.xuid;
+    let items = [];
+
+    let tprCfg = config.get("tpr");
+    if (tprCfg.enabled) {
+        let count = Util.getCount("tprCounts", xuid);
+        items.push({
+            key: "tpr", title: "随机传送", cmd: "/tpr", count: count,
+            price: whCost(Formulas.tprCost, count),
+            note: "冷却 " + tprCfg.cooldownSeconds + " 秒"
+        });
+    }
+
+    let tpaCfg = config.get("tpa");
+    if (tpaCfg.enabled) {
+        let count = Util.getCount("tpaCounts", xuid);
+        items.push({
+            key: "tpa", title: "传送请求", cmd: "/tpa", count: count,
+            price: whCost(Formulas.tpaCost, count),
+            note: "被拒绝按 " + Math.round((tpaCfg.refundRate || 0) * 100) + "% 退还"
+        });
+    }
+
+    let warpCfg = config.get("warp");
+    if (warpCfg.enabled) {
+        let count = Util.getCount("warpCounts", xuid);
+        items.push({
+            key: "warp", title: "地标传送", cmd: "/warp", count: count,
+            price: whCost(Formulas.warpCost, count),
+            note: ""
+        });
+    }
+
+    let suicideCfg = config.get("suicide");
+    if (suicideCfg.enabled) {
+        let count = Util.getCount("suicideCounts", xuid);
+        items.push({
+            key: "suicide", title: "自杀", cmd: "/suicide", count: count,
+            price: whCost(Formulas.suicideCost, count),
+            note: ""
+        });
+    }
+
+    let backCfg = config.get("back");
+    if (backCfg.enabled) {
+        let count = Util.getCount("backCounts", xuid);
+        let maxIndex = Math.max(1, Math.min(10, backCfg.maxDeathRecords || 5));
+        let variants = [];
+        for (let i = 1; i <= maxIndex; i++) {
+            variants.push({ label: "第 " + i + " 条死亡记录", price: whCost(Formulas.backCost, count, i) });
+        }
+        items.push({
+            key: "back", title: "返回死亡点", cmd: "/back", count: count,
+            variants: variants, note: "记录越新费用越高"
+        });
+    }
+
+    let homeCfg = config.get("home");
+    if (homeCfg.enabled) {
+        let homeCount = Object.keys(homeDb.get(xuid) || {}).length;
+        items.push({
+            key: "homeAdd", title: "新建家园", cmd: "/home add", count: homeCount,
+            price: whCost(Formulas.homeAddCost, homeCount),
+            note: "已有 " + homeCount + " 个家园"
+        });
+
+        let goCount = Util.getCount("homeGoCounts", xuid);
+        items.push({
+            key: "homeGo", title: "回到家园", cmd: "/home go", count: goCount,
+            price: whCost(Formulas.homeGoCost, goCount),
+            note: ""
+        });
+
+        let pubCfg = homeCfg.publish || {};
+        if (pubCfg.enabled) {
+            let maxDays = pubCfg.maxDays || 30;
+            let dayList = [1, 7, maxDays];
+            let picked = [];
+            for (let day of dayList) {
+                if (day >= 1 && day <= maxDays && picked.indexOf(day) < 0) picked.push(day);
+            }
+            let variants = picked.map((day) => ({ label: day + " 天", price: whCost(Formulas.homePublishCost, day) }));
+            items.push({
+                key: "homePublish", title: "公开家园", cmd: "/home publish", count: null,
+                variants: variants, note: "最长 " + maxDays + " 天"
+            });
+        }
+    }
+
+    let tpsCfg = config.get("tps");
+    if (tpsCfg.enabled && tpsCfg.playerEnabled) {
+        let count = Util.getCount("tpsCounts", xuid);
+        items.push({
+            key: "tps", title: "查询 TPS", cmd: "/tps", count: count,
+            price: whCost(Formulas.tpsCost, count),
+            note: ""
+        });
+    }
+
+    let eco = config.get("economy");
+    return {
+        economy: eco.type === "llmoney" ? "LLMoney" : ("计分板 " + eco.sbName),
+        balance: whBalance(xuid, mc.getPlayer(xuid)),
+        today: Util.getTodayStr(),
+        items: items
+    };
+}
+
+function whQueryBans() {
+    let cfg = whCfg();
+    let now = Date.now();
+    if (whCacheBans.data && now - whCacheBans.at < cfg.cacheTtlMs) return whCacheBans.data;
+
+    let bans = banDb.get("list") || [];
+    let items = [];
+    let limit = Math.min(bans.length, WH_BAN_MAX_ROWS);
+    for (let i = bans.length - 1; i >= 0 && items.length < limit; i--) {
+        let ban = bans[i];
+        items.push({
+            id: ban.id,
+            names: (ban.names || []).join(" / "),
+            xuid: (ban.xuids && ban.xuids.length) ? whMaskXuid(ban.xuids[0]) : "",
+            ips: (ban.ips || []).map(whMaskIp).join(" / "),
+            clients: (ban.clientIds || []).map(whMaskClient).join(" / "),
+            reason: ban.reason || "",
+            expireAt: whFmtTime(ban.expireTime),
+            permanent: !ban.expireTime
+        });
+    }
+
+    let data = { total: bans.length, items: items };
+    whCacheBans = { at: now, data: data };
+    return data;
+}
+
+function whNameMatch(pData, keyword) {
+    if (pData.name && String(pData.name).toLowerCase().indexOf(keyword) >= 0) return true;
+    let history = pData.historyname || [];
+    for (let name of history) {
+        if (String(name).toLowerCase().indexOf(keyword) >= 0) return true;
+    }
+    return false;
+}
+
+function whQueryPlayers(keyword) {
+    let query = String(keyword || "").trim().toLowerCase();
+    let dbCfg = config.get("playerDatabase");
+    let minLength = dbCfg.queryMinLength || 3;
+    if (query.length < minLength) {
+        return { total: 0, items: [], minLength: minLength, message: "关键词至少 " + minLength + " 个字符" };
+    }
+
+    let now = Date.now();
+    if (whCachePlayers.data && whCachePlayers.key === query && now - whCachePlayers.at < 60000) {
+        return whCachePlayers.data;
+    }
+
+    let keys = pdbKV.listKey();
+    let items = [];
+    for (let xuid of keys) {
+        if (items.length >= WH_PLAYER_MAX_ROWS) break;
+        let raw = pdbKV.get(xuid);
+        if (!raw) continue;
+        if (raw.toLowerCase().indexOf(query) < 0) continue;
+        let pData = JSON.parse(raw);
+        if (!whNameMatch(pData, query)) continue;
+        items.push({
+            name: pData.name || "",
+            xuid: whMaskXuid(xuid),
+            onlineMinutes: Math.round(pData.OnlineTime || 0),
+            lastOnlineAt: whFmtTime(pData.lastOnlineTime),
+            historyNames: pData.historyname || []
+        });
+    }
+
+    items.sort(function (a, b) { return b.onlineMinutes - a.onlineMinutes; });
+
+    let data = {
+        total: items.length,
+        items: items,
+        truncated: items.length >= WH_PLAYER_MAX_ROWS,
+        minLength: minLength
+    };
+    whCachePlayers = { key: query, at: now, data: data };
+    return data;
+}
+
+function whAuditDates() {
+    let days = Math.max(1, Math.min(7, whCfg().auditTailDays || 3));
+    let now = Date.now();
+    let list = [];
+    let pad = (n) => (n < 10 ? "0" + n : "" + n);
+    for (let i = 0; i < days; i++) {
+        let d = new Date(now - i * 86400000);
+        list.push(d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()));
+    }
+    return list;
+}
+
+function whReadTail(path, maxBytes) {
+    if (!File.exists(path)) return null;
+    let fi = new File(path, file.ReadMode);
+    let size = fi.size;
+    let text;
+    if (size > maxBytes) {
+        fi.seekTo(size - maxBytes);
+        text = fi.readSync(maxBytes) || "";
+        let newline = text.indexOf("\n");
+        if (newline >= 0) text = text.substring(newline + 1);
+    } else {
+        text = fi.readAllSync() || "";
+    }
+    fi.close();
+    return text;
+}
+
+function whParseCsvLine(line) {
+    let out = [];
+    let cur = "";
+    let quoted = false;
+    for (let i = 0; i < line.length; i++) {
+        let ch = line.charAt(i);
+        if (quoted) {
+            if (ch === '"') {
+                if (line.charAt(i + 1) === '"') { cur += '"'; i++; }
+                else quoted = false;
+            } else {
+                cur += ch;
+            }
+        } else if (ch === '"') {
+            quoted = true;
+        } else if (ch === ",") {
+            out.push(cur);
+            cur = "";
+        } else {
+            cur += ch;
+        }
+    }
+    out.push(cur);
+    return out;
+}
+
+function whQueryAudit(date, eventFilter, keyword) {
+    let dates = whAuditDates();
+    if (dates.indexOf(date) < 0) date = dates[0];
+
+    let path = LOG_PATH + "/" + date + ".csv";
+    let size = -1;
+    if (File.exists(path)) {
+        let fi = new File(path, file.ReadMode);
+        size = fi.size;
+        fi.close();
+    }
+    if (size < 0) {
+        return { date: date, dates: dates, total: 0, items: [], events: {}, truncated: false };
+    }
+
+    let cacheKey = date + "|" + size;
+    if (!whCacheAudit.rows || whCacheAudit.key !== cacheKey) {
+        let text = whReadTail(path, WH_AUDIT_TAIL_BYTES) || "";
+        let lines = text.split(/\r?\n/);
+        let rows = [];
+        let events = {};
+        let start = (lines.length > 0 && /^"?Time"?\s*,/.test(lines[0])) ? 1 : 0;
+
+        for (let i = start; i < lines.length; i++) {
+            let line = lines[i];
+            if (!line) continue;
+            let cols = whParseCsvLine(line);
+            if (cols.length < 4) continue;
+            let event = cols[2];
+            events[event] = (events[event] || 0) + 1;
+            rows.push({ time: cols[0], player: cols[1], event: event, data: cols.slice(3).join(",") });
+        }
+
+        rows.reverse();
+        whCacheAudit = { key: cacheKey, rows: rows, events: events };
+    }
+
+    let items = whCacheAudit.rows;
+    if (eventFilter) {
+        items = items.filter((row) => row.event === eventFilter);
+    }
+    if (keyword) {
+        items = items.filter((row) => (row.player + " " + row.event + " " + row.data).toLowerCase().indexOf(keyword) >= 0);
+    }
+
+    let total = items.length;
+    return {
+        date: date,
+        dates: dates,
+        total: total,
+        events: whCacheAudit.events,
+        items: items.slice(0, WH_AUDIT_MAX_ROWS),
+        truncated: total > WH_AUDIT_MAX_ROWS
+    };
+}
+
+function whQueryWords() {
+    let cfg = config.get("wordFilter") || {};
+    return { enabled: !!cfg.enabled, words: cfg.words || [] };
+}
+
+
+function whFindPlayerExact(name) {
+    let lower = String(name).toLowerCase();
+
+    let online = mc.getOnlinePlayers();
+    for (let player of online) {
+        if (player.realName && player.realName.toLowerCase() === lower) {
+            return { xuid: player.xuid, name: player.realName };
+        }
+    }
+
+    let keys = pdbKV.listKey();
+    for (let xuid of keys) {
+        let raw = pdbKV.get(xuid);
+        if (!raw) continue;
+        if (raw.toLowerCase().indexOf(lower) < 0) continue;
+        let pData = JSON.parse(raw);
+        if (String(pData.name).toLowerCase() === lower) return { xuid: xuid, name: pData.name };
+        let history = pData.historyname || [];
+        for (let oldName of history) {
+            if (String(oldName).toLowerCase() === lower) return { xuid: xuid, name: pData.name };
+        }
+    }
+    return null;
+}
+
+function whActNoticeSet(body, acc) {
+    let content = typeof body.content === "string" ? body.content : "";
+    if (content.length === 0) return { status: 400, body: { error: "公告内容不能为空" } };
+    if (content.length > 4000) return { status: 400, body: { error: "公告不能超过 4000 个字符" } };
+
+    let cfg = config.get("notice");
+    cfg.content = content;
+    config.set("notice", cfg);
+    csvLog("WebAction", acc.playerName || acc.username || "?", "notice.set (" + content.length + " chars)");
+    return { ok: true, length: content.length };
+}
+
+function whActBanAdd(body, acc) {
+    let name = String(body.name || "").trim();
+    let reason = String(body.reason || "").trim().slice(0, 200);
+    let days = parseInt(body.days, 10);
+
+    if (!name) return { status: 400, body: { error: "请填写玩家名" } };
+    if (!isFinite(days) || days < 1 || days > 3650) {
+        return { status: 400, body: { error: "封禁天数需在 1 到 3650 之间" } };
+    }
+
+    let target = whFindPlayerExact(name);
+    if (!target) return { status: 404, body: { error: "玩家数据库里没有这个名字，请确认拼写" } };
+    if (checkLocalBan(target.xuid, target.name, "", "").banned) {
+        return { status: 409, body: { error: "该玩家已在封禁中" } };
+    }
+
+    addLocalBan({ xuid: target.xuid, name: target.name }, reason, days);
+    whCacheBans = { at: 0, data: null };
+
+    let online = mc.getPlayer(target.xuid);
+    if (online) {
+        online.kick(tr(online, "ban.kick.local", { reason: reason || tr(online, "ban.reason.default") }));
+    }
+
+    csvLog("WebAction", acc.playerName || acc.username || "?", "ban.add " + target.name + " " + days + "d (" + reason + ")");
+    return { ok: true, name: target.name };
+}
+
+function whActBanUnban(body, acc) {
+    let id = String(body.id || "");
+    if (!id) return { status: 400, body: { error: "缺少封禁记录 ID" } };
+
+    let bans = banDb.get("list") || [];
+    for (let i = 0; i < bans.length; i++) {
+        if (bans[i].id !== id) continue;
+        let names = (bans[i].names || []).join("/");
+        bans.splice(i, 1);
+        banDb.set("list", bans);
+        whCacheBans = { at: 0, data: null };
+        csvLog("WebAction", acc.playerName || acc.username || "?", "ban.unban " + names);
+        return { ok: true, names: names };
+    }
+    return { status: 404, body: { error: "这条封禁记录不存在，可能已过期或已被解除" } };
+}
+
+function whActWordFilter(body, acc, isAdd) {
+    let word = String(body.word || "").trim();
+    if (!word) return { status: 400, body: { error: "请填写敏感词" } };
+    if (word.length > 20) return { status: 400, body: { error: "敏感词不能超过 20 个字符" } };
+
+    let cfg = config.get("wordFilter") || {};
+    let words = cfg.words || [];
+    let index = words.indexOf(word);
+
+    if (isAdd) {
+        if (index >= 0) return { ok: true, duplicated: true, total: words.length };
+        words.push(word);
+    } else {
+        if (index < 0) return { status: 404, body: { error: "词库里没有这个词" } };
+        words.splice(index, 1);
+    }
+
+    cfg.words = words;
+    config.set("wordFilter", cfg);
+    csvLog("WebAction", acc.playerName || acc.username || "?", (isAdd ? "wordfilter.add " : "wordfilter.remove ") + word);
+    return { ok: true, total: words.length };
+}
+
+function whHandleAction(name, body, acc, isAdmin) {
+    if (!whCfg().allowAdminActions) {
+        return JSON.stringify({ status: 403, body: { error: "服主已关闭网页管理功能" } });
+    }
+    if (!isAdmin) return whForbidden();
+
+    if (name === "notice_set") return JSON.stringify(whActNoticeSet(body, acc));
+    if (name === "ban_add") return JSON.stringify(whActBanAdd(body, acc));
+    if (name === "ban_unban") return JSON.stringify(whActBanUnban(body, acc));
+    if (name === "wordfilter_add") return JSON.stringify(whActWordFilter(body, acc, true));
+    if (name === "wordfilter_remove") return JSON.stringify(whActWordFilter(body, acc, false));
+
+    return JSON.stringify({ status: 404, body: { error: "未声明的动作：" + name } });
+}
+
+
+function whDispatch(reqJson) {
+    let req;
+    try {
+        req = JSON.parse(reqJson);
+    } catch (e) {
+        return JSON.stringify({ status: 400, body: { error: "请求不是合法 JSON" } });
+    }
+
+    let path = req.path || "";
+    let acc = req.account || {};
+    let isAdmin = acc.role === "admin";
+
+    if (req.kind === "action") {
+        return whHandleAction(path, req.body || {}, acc, isAdmin);
+    }
+
+    if (path === "homes.public") return JSON.stringify(whQueryPublicHomes());
+    if (path === "notice.get") return JSON.stringify(whQueryNotice(acc));
+
+    if (path === "me.profile") {
+        if (!acc.xuid) return JSON.stringify({ status: 401, body: { error: "请先登录" } });
+        return JSON.stringify(whQueryProfile(acc));
+    }
+
+    if (path === "prices") {
+        if (!acc.xuid) return JSON.stringify({ status: 401, body: { error: "请先登录" } });
+        return JSON.stringify(whQueryPrices(acc));
+    }
+
+    if (path === "admin.bans") {
+        if (!isAdmin) return whForbidden();
+        return JSON.stringify(whQueryBans());
+    }
+
+    if (path === "admin.players") {
+        if (!isAdmin) return whForbidden();
+        return JSON.stringify(whQueryPlayers((req.query || {}).q));
+    }
+
+    if (path === "admin.audit") {
+        if (!isAdmin) return whForbidden();
+        let query = req.query || {};
+        return JSON.stringify(whQueryAudit(query.date || "", query.event || "", String(query.keyword || "").toLowerCase()));
+    }
+
+    if (path === "admin.words") {
+        if (!isAdmin) return whForbidden();
+        return JSON.stringify(whQueryWords());
+    }
+
+    return JSON.stringify({ status: 404, body: { error: "未知接口：" + path } });
+}
+
+
+const WH_CSS = `
+body{font:14px/1.6 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+     margin:0;padding:16px;background:var(--bg2,#161b22);color:var(--fg,#e6edf3)}
+h1{font-size:17px;font-weight:500;margin:0 0 4px}
+.sub{color:var(--fg2,#9aa7b4);font-size:12.5px;margin:0 0 14px}
+.card{background:var(--bg3,#1d242e);border:1px solid var(--line,#2a3441);
+      border-radius:var(--radius,14px);padding:14px;margin-bottom:12px;overflow-x:auto}
+.bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:12px}
+.stat{background:var(--bg3,#1d242e);border:1px solid var(--line,#2a3441);border-radius:10px;padding:10px 12px}
+.stat .k{color:var(--fg3,#7d8896);font-size:12px}
+.stat .v{font-size:20px;font-weight:500;font-variant-numeric:tabular-nums}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line,#232c38);vertical-align:top}
+th{color:var(--fg3,#7d8896);font-weight:400;font-size:12px;white-space:nowrap}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
+tr.sub td{background:transparent;color:var(--fg2,#9aa7b4);font-size:12.5px;padding-top:3px;padding-bottom:3px}
+.muted{color:var(--fg3,#7d8896)}
+.mono{font-family:ui-monospace,Consolas,monospace;font-size:12px}
+input,select,textarea{font:inherit;background:var(--bg2,#0f141a);color:var(--fg,#e6edf3);
+      border:1px solid var(--line,#2a3441);border-radius:8px;padding:7px 10px}
+textarea{width:100%;min-height:120px;resize:vertical;box-sizing:border-box}
+button{font:inherit;background:var(--bg3,#1d242e);color:var(--fg,#e6edf3);
+       border:1px solid var(--line,#2a3441);border-radius:8px;padding:6px 12px;cursor:pointer}
+button.primary{background:var(--accent2,#2d7ff9);border-color:var(--accent2,#2d7ff9);color:#fff}
+button.mini{padding:3px 9px;font-size:12px}
+button.danger{border-color:var(--err,#e24b4a);color:var(--err,#e24b4a)}
+button:disabled{opacity:.45;cursor:default}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.tab{padding:6px 13px;border-radius:8px;border:1px solid var(--line,#2a3441);cursor:pointer;
+     color:var(--fg2,#9aa7b4);font-size:13px}
+.tab.on{background:var(--accent-soft,#23405f);border-color:var(--accent2,#2d7ff9);color:var(--fg,#e6edf3)}
+.pill{display:inline-block;padding:1px 9px;border-radius:99px;font-size:12px;margin:0 4px 4px 0;
+      background:var(--accent-soft,#23405f);color:var(--fg,#e6edf3)}
+.pill a{cursor:pointer;opacity:.6;margin-left:4px}
+.empty{color:var(--fg3,#7d8896);padding:16px 4px;text-align:center}
+.err{color:var(--err,#e08b8b);font-size:13px;margin-top:8px}
+.ok{color:var(--ok,#5dcaa5);font-size:13px;margin-top:8px}
+.tip{color:var(--fg3,#7d8896);font-size:12px;margin-top:4px}
+pre{white-space:pre-wrap;word-break:break-word;margin:0;font:inherit;line-height:1.7}
+.dl{display:grid;grid-template-columns:110px 1fr;gap:8px 12px;font-size:13px}
+.dl .k{color:var(--fg3,#7d8896)}
+`;
+
+const WH_JS_COMMON = `
+function esc(s){return String(s===null||s===undefined?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");}
+function num(n){if(n===null||n===undefined||isNaN(n))return "-";return Number(n).toLocaleString("zh-CN");}
+function call(p,o){return window.WEBHUB.call(p,o||{});}
+function act(n,p){return window.WEBHUB.action(n,p||{});}
+function box(id,msg,cls){var el=document.getElementById(id);if(!el)return;el.textContent=msg;el.className=cls||"err";el.style.display="block";}
+function hide(id){var el=document.getElementById(id);if(el)el.style.display="none";}
+function errText(e){if(!e)return "未知错误";if(e.code==="FORBIDDEN")return "需要管理员权限";return e.message||e.code||String(e);}
+function twice(btn,label,fn){
+  if(btn.__armed){clearTimeout(btn.__t);btn.__armed=false;btn.textContent=label;btn.classList.remove("danger");fn();return;}
+  btn.__armed=true;btn.textContent="再点一次确认";btn.classList.add("danger");
+  btn.__t=setTimeout(function(){btn.__armed=false;btn.textContent=label;btn.classList.remove("danger");},3000);
+}
+`;
+
+function whShell(title, sub, body, script) {
+    return '<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8">'
+        + '<meta name="viewport" content="width=device-width,initial-scale=1">'
+        + '<style>' + WH_CSS + '</style></head><body>'
+        + '<h1>' + title + '</h1><div class="sub">' + sub + '</div>'
+        + body
+        + '<script>' + WH_JS_COMMON + script + '</script></body></html>';
+}
+
+const WH_BODY_HOMES = `
+<div class="card">
+  <div class="bar">
+    <input id="kw" placeholder="搜索家园名或发布者" style="flex:1;min-width:150px">
+    <select id="dim">
+      <option value="">全部维度</option>
+      <option value="主世界">主世界</option>
+      <option value="下界">下界</option>
+      <option value="末地">末地</option>
+    </select>
+  </div>
+  <table><thead><tr><th>家园</th><th>发布者</th><th>维度</th><th class="n">坐标</th><th class="n">剩余</th></tr></thead>
+  <tbody id="tb"></tbody></table>
+  <div class="empty" id="empty" style="display:none">还没有玩家公开家园</div>
+  <div class="err" id="err" style="display:none"></div>
+</div>
+<div class="tip">在游戏内执行 /home publish 可以把自己的家园公开到这里，到期自动下架。</div>
+`;
+
+const WH_SCRIPT_HOMES = `
+var all=[];
+function render(){
+  var kw=document.getElementById("kw").value.trim().toLowerCase();
+  var dim=document.getElementById("dim").value;
+  var rows=all.filter(function(h){
+    if(dim&&h.dim!==dim)return false;
+    if(kw&&(h.name+" "+h.publisher).toLowerCase().indexOf(kw)<0)return false;
+    return true;
+  });
+  document.getElementById("tb").innerHTML=rows.map(function(h){
+    return "<tr><td>"+esc(h.name)+"</td><td class='muted'>"+esc(h.publisher)+"</td><td>"+esc(h.dim)+"</td>"
+      +"<td class='n mono'>"+h.x+", "+h.y+", "+h.z+"</td>"
+      +"<td class='n'>"+(h.daysLeft===null?"长期":h.daysLeft+" 天")+"</td></tr>";
+  }).join("");
+  document.getElementById("empty").style.display=rows.length?"none":"block";
+}
+async function load(){
+  try{ var d=await call("homes.public"); }
+  catch(e){ box("err","读取失败："+errText(e)); return; }
+  hide("err"); all=d.items||[]; render();
+}
+document.getElementById("kw").oninput=render;
+document.getElementById("dim").onchange=render;
+load();
+`;
+
+const WH_BODY_PRICES = `
+<div class="grid">
+  <div class="stat"><div class="k">当前余额</div><div class="v" id="bal">-</div></div>
+  <div class="stat"><div class="k">经济来源</div><div class="v" id="eco" style="font-size:14px">-</div></div>
+  <div class="stat"><div class="k">计费日</div><div class="v" id="day" style="font-size:14px">-</div></div>
+</div>
+<div class="card">
+  <table><thead><tr><th>服务</th><th>指令</th><th class="n">今日已用</th><th class="n">下一次费用</th></tr></thead>
+  <tbody id="tb"></tbody></table>
+  <div class="err" id="err" style="display:none"></div>
+</div>
+<div class="tip">费用按「今日已用次数」逐次递增，每天零点重置；实际扣费以游戏内为准。</div>
+`;
+
+const WH_SCRIPT_PRICES = `
+async function load(){
+  var d;
+  try{ d=await call("prices"); }
+  catch(e){ box("err","读取失败："+errText(e)); return; }
+  hide("err");
+  document.getElementById("bal").textContent=num(d.balance);
+  document.getElementById("eco").textContent=d.economy;
+  document.getElementById("day").textContent=d.today;
+  var html="";
+  (d.items||[]).forEach(function(it){
+    if(it.variants&&it.variants.length){
+      html+="<tr><td>"+esc(it.title)+"</td><td class='muted mono'>"+esc(it.cmd)+"</td><td class='n'>-</td><td class='n muted'>按档计费</td></tr>";
+      it.variants.forEach(function(v){
+        html+="<tr class='sub'><td></td><td>"+esc(v.label)+"</td><td></td><td class='n'>"+num(v.price)+"</td></tr>";
+      });
+    }else{
+      html+="<tr><td>"+esc(it.title)+"</td><td class='muted mono'>"+esc(it.cmd)+"</td><td class='n'>"+it.count+"</td><td class='n'>"+num(it.price)+"</td></tr>";
+    }
+  });
+  document.getElementById("tb").innerHTML=html;
+}
+load();
+`;
+
+const WH_BODY_ME = `
+<div class="card">
+  <div class="dl">
+    <div class="k">玩家名</div><div id="name">-</div>
+    <div class="k">注册时间</div><div id="reg">-</div>
+    <div class="k">累计在线</div><div id="online">-</div>
+    <div class="k">最后上线</div><div id="last">-</div>
+    <div class="k">家园数量</div><div id="homes">-</div>
+    <div class="k">公开中的家园</div><div id="pubs">-</div>
+    <div class="k">当前余额</div><div id="bal">-</div>
+    <div class="k">历史名字</div><div id="hist">-</div>
+  </div>
+  <div class="err" id="err" style="display:none"></div>
+</div>
+<div class="tip">数据每 5 秒随在线时长统计刷新；余额以游戏内为准。</div>
+`;
+
+const WH_SCRIPT_ME = `
+function hours(m){
+  if(m<60)return m+" 分钟";
+  var h=Math.floor(m/60),r=m%60;
+  return h+" 小时"+(r?" "+r+" 分钟":"");
+}
+async function load(){
+  var d;
+  try{ d=await call("me.profile"); }
+  catch(e){ box("err","读取失败："+errText(e)); return; }
+  hide("err");
+  document.getElementById("name").textContent=d.name||"-";
+  document.getElementById("reg").textContent=d.registerAt||"无记录";
+  document.getElementById("online").textContent=hours(d.onlineMinutes||0);
+  document.getElementById("last").textContent=d.lastOnlineAt||"-";
+  document.getElementById("homes").textContent=(d.homeCount||0)+" 个";
+  document.getElementById("pubs").textContent=(d.publicHomeCount||0)+" 个";
+  document.getElementById("bal").textContent=num(d.balance)+" ("+d.economy+")";
+  document.getElementById("hist").textContent=(d.historyNames&&d.historyNames.length)?d.historyNames.join(" / "):"无";
+}
+load();
+`;
+
+const WH_BODY_NOTICE = `
+<div class="card">
+  <pre id="content">加载中…</pre>
+  <div class="err" id="err" style="display:none"></div>
+</div>
+<div class="tip" id="tip"></div>
+`;
+
+const WH_SCRIPT_NOTICE = `
+async function load(){
+  var d;
+  try{ d=await call("notice.get"); }
+  catch(e){ box("err","读取失败："+errText(e)); return; }
+  hide("err");
+  document.getElementById("content").textContent=d.content||"（暂无公告）";
+  document.getElementById("tip").textContent=d.enabled?"":"注意：公告功能当前已在服务器关闭，这里显示的是历史文案。";
+}
+load();
+`;
+
+const WH_BODY_ADMIN = `
+<div class="tabs">
+  <div class="tab on" id="tab-bans">封禁管理</div>
+  <div class="tab" id="tab-players">玩家检索</div>
+  <div class="tab" id="tab-audit">审计日志</div>
+  <div class="tab" id="tab-notice">公告</div>
+  <div class="tab" id="tab-words">敏感词</div>
+</div>
+
+<div id="panel-bans" style="display:block">
+  <div class="card">
+    <div class="bar">
+      <input id="banName" placeholder="玩家名" style="width:130px">
+      <input id="banDays" placeholder="天数" value="7" style="width:70px">
+      <input id="banReason" placeholder="原因（可选）" style="flex:1;min-width:130px">
+      <button class="primary" id="banBtn">封禁</button>
+    </div>
+    <table><thead><tr><th>玩家</th><th>原因</th><th>到期</th><th class="mono">IP</th><th></th></tr></thead>
+    <tbody id="banTb"></tbody></table>
+    <div class="err" id="banErr" style="display:none"></div>
+    <div class="ok" id="banOk" style="display:none"></div>
+  </div>
+</div>
+
+<div id="panel-players" style="display:none">
+  <div class="card">
+    <div class="bar">
+      <input id="pq" placeholder="输入名字片段（至少 3 个字符）" style="flex:1;min-width:180px">
+      <button class="primary" id="pBtn">检索</button>
+    </div>
+    <table><thead><tr><th>玩家</th><th class="n">累计在线</th><th>最后上线</th><th class="mono">XUID</th></tr></thead>
+    <tbody id="pTb"></tbody></table>
+    <div class="err" id="pErr" style="display:none"></div>
+    <div class="tip" id="pTip"></div>
+  </div>
+</div>
+
+<div id="panel-audit" style="display:none">
+  <div class="card">
+    <div class="bar">
+      <select id="auDate"></select>
+      <select id="auEvent">
+        <option value="">全部事件</option>
+        <option>Home</option><option>Warp</option><option>BanCheck</option>
+        <option>ApiEcoAdd</option><option>ApiEcoReduce</option><option>WebAction</option>
+      </select>
+      <input id="auKw" placeholder="搜索玩家或内容" style="flex:1;min-width:150px">
+      <button id="auBtn">刷新</button>
+    </div>
+    <table><thead><tr><th style="width:80px">时间</th><th style="width:130px">玩家</th><th style="width:110px">事件</th><th>内容</th></tr></thead>
+    <tbody id="auTb"></tbody></table>
+    <div class="err" id="auErr" style="display:none"></div>
+    <div class="tip" id="auTip"></div>
+  </div>
+</div>
+
+<div id="panel-notice" style="display:none">
+  <div class="card">
+    <textarea id="ntText" placeholder="公告内容，支持 § 颜色码和换行"></textarea>
+    <div class="bar" style="margin-top:10px">
+      <button class="primary" id="ntBtn">保存公告</button>
+      <span class="muted" id="ntInfo"></span>
+    </div>
+    <div class="err" id="ntErr" style="display:none"></div>
+    <div class="ok" id="ntOk" style="display:none"></div>
+  </div>
+</div>
+
+<div id="panel-words" style="display:none">
+  <div class="card">
+    <div class="bar">
+      <input id="wfInput" placeholder="要屏蔽的词" style="flex:1;min-width:150px">
+      <button class="primary" id="wfBtn">添加</button>
+    </div>
+    <div id="wfList" style="margin-bottom:10px"></div>
+    <div class="err" id="wfErr" style="display:none"></div>
+    <div class="ok" id="wfOk" style="display:none"></div>
+    <div class="tip" id="wfTip"></div>
+  </div>
+</div>
+`;
+
+const WH_SCRIPT_ADMIN = `
+var TABS=["bans","players","audit","notice","words"];
+function show(name){
+  TABS.forEach(function(k){
+    document.getElementById("tab-"+k).className="tab"+(k===name?" on":"");
+    document.getElementById("panel-"+k).style.display=(k===name?"block":"none");
+  });
+  if(name==="bans")loadBans();
+  if(name==="audit")loadAudit();
+  if(name==="notice")loadNotice();
+  if(name==="words")loadWords();
+}
+TABS.forEach(function(k){document.getElementById("tab-"+k).onclick=function(){show(k);};});
+
+async function loadBans(){
+  hide("banErr");
+  var d;
+  try{ d=await call("admin.bans"); }
+  catch(e){ box("banErr",errText(e)); return; }
+  var tb=document.getElementById("banTb");
+  if(!d.items||!d.items.length){ tb.innerHTML="<tr><td colspan='5' class='empty'>没有生效中的封禁</td></tr>"; return; }
+  tb.innerHTML=d.items.map(function(b){
+    var who=esc(b.names)+(b.xuid?"<div class='muted mono'>"+esc(b.xuid)+"</div>":"");
+    return "<tr><td>"+who+"</td><td>"+esc(b.reason)+"</td>"
+      +"<td>"+(b.permanent?"永久":esc(b.expireAt||""))+"</td>"
+      +"<td class='mono muted'>"+esc(b.ips||"-")+"</td>"
+      +"<td><button class='mini' data-id='"+esc(b.id)+"'>解封</button></td></tr>";
+  }).join("");
+  Array.prototype.forEach.call(tb.querySelectorAll("button[data-id]"),function(btn){
+    btn.onclick=function(){ twice(btn,"解封",function(){ unban(btn.getAttribute("data-id")); }); };
+  });
+}
+
+async function unban(id){
+  hide("banOk");
+  try{ await act("ban_unban",{id:id}); box("banOk","已解除封禁","ok"); loadBans(); }
+  catch(e){ box("banErr",errText(e)); }
+}
+
+document.getElementById("banBtn").onclick=function(){
+  var btn=this;
+  twice(btn,"封禁",async function(){
+    hide("banOk");hide("banErr");
+    var name=document.getElementById("banName").value.trim();
+    var days=parseInt(document.getElementById("banDays").value,10);
+    var reason=document.getElementById("banReason").value.trim();
+    if(!name){ box("banErr","请填写玩家名"); return; }
+    if(!(days>=1)){ box("banErr","天数需要大于 0"); return; }
+    try{
+      await act("ban_add",{name:name,days:days,reason:reason});
+      box("banOk","已封禁 "+name,"ok");
+      document.getElementById("banName").value="";
+      loadBans();
+    }catch(e){ box("banErr",errText(e)); }
+  });
+};
+
+document.getElementById("pBtn").onclick=async function(){
+  hide("pErr");
+  var q=document.getElementById("pq").value.trim();
+  var tb=document.getElementById("pTb");
+  try{
+    var d=await call("admin.players",{query:{q:q}});
+    document.getElementById("pTip").textContent=d.truncated?"结果较多，只显示前 20 条":"";
+    if(d.message){ tb.innerHTML="<tr><td colspan='4' class='empty'>"+esc(d.message)+"</td></tr>"; return; }
+    if(!d.items||!d.items.length){ tb.innerHTML="<tr><td colspan='4' class='empty'>没有匹配的玩家</td></tr>"; return; }
+    tb.innerHTML=d.items.map(function(p){
+      var hist=(p.historyNames&&p.historyNames.length)?"<div class='muted'>曾用名 "+esc(p.historyNames.join(" / "))+"</div>":"";
+      return "<tr><td>"+esc(p.name)+hist+"</td><td class='n'>"+num(p.onlineMinutes)+" 分钟</td>"
+        +"<td class='muted'>"+esc(p.lastOnlineAt||"-")+"</td><td class='mono muted'>"+esc(p.xuid)+"</td></tr>";
+    }).join("");
+  }catch(e){ box("pErr",errText(e)); }
+};
+
+async function loadAudit(){
+  hide("auErr");
+  var date=document.getElementById("auDate").value;
+  var ev=document.getElementById("auEvent").value;
+  var kw=document.getElementById("auKw").value.trim();
+  var tb=document.getElementById("auTb");
+  try{
+    var d=await call("admin.audit",{query:{date:date,event:ev,keyword:kw}});
+    var sel=document.getElementById("auDate");
+    if(sel.options.length!==d.dates.length||(sel.options[0]&&sel.options[0].value!==d.dates[0])){
+      sel.innerHTML=d.dates.map(function(x){return "<option value='"+esc(x)+"'>"+esc(x)+"</option>";}).join("");
+      sel.value=d.date;
+    }
+    var evSel=document.getElementById("auEvent");
+    if(d.events&&evSel.options.length<=1){
+      Object.keys(d.events).sort().forEach(function(k){
+        var o=document.createElement("option");o.value=k;o.textContent=k+" ("+d.events[k]+")";evSel.appendChild(o);
+      });
+    }
+    document.getElementById("auTip").textContent="共 "+d.total+" 条"+(d.truncated?"，只显示最近 300 条":"")+(d.total?"；日志每 5 秒落盘一次":"");
+    if(!d.items.length){ tb.innerHTML="<tr><td colspan='4' class='empty'>这一天没有记录</td></tr>"; return; }
+    tb.innerHTML=d.items.map(function(r){
+      return "<tr><td class='mono'>"+esc(r.time)+"</td><td>"+esc(r.player)+"</td>"
+        +"<td><span class='pill'>"+esc(r.event)+"</span></td><td class='muted'>"+esc(r.data)+"</td></tr>";
+    }).join("");
+  }catch(e){ box("auErr",errText(e)); }
+}
+document.getElementById("auBtn").onclick=loadAudit;
+document.getElementById("auDate").onchange=loadAudit;
+document.getElementById("auEvent").onchange=loadAudit;
+document.getElementById("auKw").oninput=function(){clearTimeout(window.__wt);window.__wt=setTimeout(loadAudit,300);};
+
+async function loadNotice(){
+  hide("ntErr");hide("ntOk");
+  try{
+    var d=await call("notice.get");
+    document.getElementById("ntText").value=(d.raw!==undefined?d.raw:d.content)||"";
+    document.getElementById("ntInfo").textContent=((d.raw!==undefined?d.raw:d.content)||"").length+" 个字符";
+  }catch(e){ box("ntErr",errText(e)); }
+}
+document.getElementById("ntBtn").onclick=async function(){
+  var btn=this;btn.disabled=true;hide("ntErr");hide("ntOk");
+  var text=document.getElementById("ntText").value;
+  try{
+    await act("notice_set",{content:text});
+    box("ntOk","公告已保存，玩家下次进服或查看公告时生效","ok");
+    document.getElementById("ntInfo").textContent=text.length+" 个字符";
+  }catch(e){ box("ntErr",errText(e)); }
+  btn.disabled=false;
+};
+
+async function loadWords(){
+  hide("wfErr");hide("wfOk");
+  try{
+    var d=await call("admin.words");
+    var wrap=document.getElementById("wfList");
+    if(!d.words||!d.words.length){ wrap.innerHTML="<span class='muted'>词库为空</span>"; }
+    else{
+      wrap.innerHTML=d.words.map(function(w){
+        return "<span class='pill'>"+esc(w)+"<a data-w='"+esc(w)+"'>×</a></span>";
+      }).join("");
+      Array.prototype.forEach.call(wrap.querySelectorAll("a[data-w]"),function(a){
+        a.onclick=function(){ removeWord(a.getAttribute("data-w")); };
+      });
+    }
+    document.getElementById("wfTip").textContent=d.enabled?"敏感词过滤已启用":"敏感词过滤已在配置中关闭";
+  }catch(e){ box("wfErr",errText(e)); }
+}
+document.getElementById("wfBtn").onclick=async function(){
+  var input=document.getElementById("wfInput");
+  var word=input.value.trim();
+  if(!word)return;
+  hide("wfErr");hide("wfOk");
+  try{ await act("wordfilter_add",{word:word}); input.value=""; box("wfOk","已添加","ok"); loadWords(); }
+  catch(e){ box("wfErr",errText(e)); }
+};
+async function removeWord(word){
+  hide("wfErr");hide("wfOk");
+  try{ await act("wordfilter_remove",{word:word}); box("wfOk","已删除","ok"); loadWords(); }
+  catch(e){ box("wfErr",errText(e)); }
+}
+
+show("bans");
+`;
+
+function whPages() {
+    if (whPageCache) return whPageCache;
+    whPageCache = [
+        {
+            name: "homes", title: "公开家园",
+            html: whShell("公开家园", "玩家发布的公开家园，按到期时间排序；坐标仅供导航参考。", WH_BODY_HOMES, WH_SCRIPT_HOMES)
+        },
+        {
+            name: "prices", title: "服务价目表",
+            html: whShell("服务价目表", "按你今天的已用次数算出的下一次费用，每次使用后价格会上浮。", WH_BODY_PRICES, WH_SCRIPT_PRICES)
+        },
+        {
+            name: "me", title: "我的档案",
+            html: whShell("我的档案", "你在本服的注册信息与游戏数据。", WH_BODY_ME, WH_SCRIPT_ME)
+        },
+        {
+            name: "notice", title: "公告",
+            html: whShell("服务器公告", "进服时也会弹窗提示的同一份内容。", WH_BODY_NOTICE, WH_SCRIPT_NOTICE)
+        },
+        {
+            name: "admin", title: "管理面板",
+            html: whShell("管理面板", "封禁、玩家检索、审计日志、公告与敏感词。所有改动都会记入审计。", WH_BODY_ADMIN, WH_SCRIPT_ADMIN)
+        }
+    ];
+    return whPageCache;
+}
+
+function whPushPages() {
+    let pages = whPages();
+    let ok = true;
+    for (let page of pages) {
+        if (!whCall("page", WH_NS, page.name, page.title, page.html)) ok = false;
+    }
+    return ok;
+}
+
+
+function whMeta() {
+    return {
+        ns: WH_NS,
+        name: "基础生存",
+        version: VERSION.join("."),
+        description: "公开家园、服务价目、个人档案、公告与管理面板",
+        icon: "hub",
+        scopes: ["rpc"],
+        menus: [
+            { path: "homes", title: "公开家园", icon: "home", role: "player", sort: 10, page: "homes" },
+            { path: "prices", title: "价目表", icon: "gauge", role: "player", sort: 20, page: "prices" },
+            { path: "me", title: "我的档案", icon: "user", role: "player", sort: 30, page: "me" },
+            { path: "notice", title: "公告", icon: "bell", role: "player", sort: 40, page: "notice" },
+            { path: "admin", title: "管理面板", icon: "shield", role: "admin", sort: 90, page: "admin" }
+        ],
+        actions: [
+            { name: "notice_set", title: "修改公告", role: "admin", params: { content: "string" } },
+            { name: "ban_add", title: "封禁玩家", role: "admin", params: { name: "string", days: "number", reason: "string" } },
+            { name: "ban_unban", title: "解除封禁", role: "admin", params: { id: "string" } },
+            { name: "wordfilter_add", title: "添加敏感词", role: "admin", params: { word: "string" } },
+            { name: "wordfilter_remove", title: "删除敏感词", role: "admin", params: { word: "string" } }
+        ]
+    };
+}
+
+function whRegister() {
+    if (whRegistered) return true;
+    if (!ll.hasExported(WH_PLATFORM, "register")) return false;
+
+    let raw = whCall("register", JSON.stringify(whMeta()));
+    let res = null;
+    try {
+        res = raw ? JSON.parse(raw) : null;
+    } catch (e) {
+        res = null;
+    }
+    if (!res || !res.ok) {
+        logger.error("[WebHub] 注册失败：" + (res ? res.error : String(raw)));
+        return false;
+    }
+
+    if (!whPushPages()) {
+        logger.warn("[WebHub] 页面推送失败：" + (whCall("lastError") || "原因未知"));
+        return false;
+    }
+
+    if (!whDispatchBound) {
+        ll.exports(whDispatch, WH_NS, WH_DISPATCH_EXPORT);
+        whDispatchBound = true;
+    }
+
+    whRegistered = true;
+    logger.info("[WebHub] 已接入网页平台（" + whPages().length + " 个页面，管理动作" + (whCfg().allowAdminActions ? "已开启" : "已关闭") + "）");
+    return true;
+}
+
+function whStart() {
+    if (!whCfg().enabled) {
+        logger.info("[WebHub] 网页接入已在配置中关闭");
+        return;
+    }
+    if (whRegister()) return;
+    if (whRetryTimer !== null) return;
+
+    whRetryTimer = setInterval(() => {
+        whRetryCount++;
+        if (whRegister() || whRetryCount >= WH_RETRY_LIMIT) {
+            clearInterval(whRetryTimer);
+            whRetryTimer = null;
+            if (!whRegistered) {
+                logger.warn("[WebHub] 重试 " + whRetryCount + " 次仍未接入：请确认 WebHub 已安装并启用；不需要网页功能可在 config.json 把 webhub.enabled 设为 false");
+            }
+        }
+    }, WH_RETRY_INTERVAL_MS);
+}
